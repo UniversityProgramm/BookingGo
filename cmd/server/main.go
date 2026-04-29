@@ -1,7 +1,18 @@
 package main
 
-import "fmt"
+import (
+	"BookingGo/pkg/db"
+	"log"
+	"os"
+
+	"github.com/joho/godotenv"
+)
 
 func main() {
-	fmt.Println("Hello World")
+	godotenv.Load()
+	dbUrl := os.Getenv("DB_URL")
+	if dbUrl == "" {
+		log.Fatal("DB_URl в .env не задан")
+	}
+	db.InitDB(dbUrl)
 }
