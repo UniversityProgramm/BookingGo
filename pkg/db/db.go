@@ -8,10 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Пул подключений к БД
 var DB *pgxpool.Pool
 
 func InitDB(dbUrl string) {
-	DB, err := pgxpool.New(context.Background(), dbUrl)
+	var err error
+	DB, err = pgxpool.New(context.Background(), dbUrl)
 	if err != nil {
 		log.Fatal("Не удалось подключиться к БД:", err)
 	}

@@ -1,8 +1,7 @@
 package handlers
 
 import (
-	"BookingGo/internal/entity"
-	"BookingGo/internal/enum"
+	"BookingGo/internal/repositories"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,8 +9,13 @@ import (
 
 // Методы для эндпоинтов
 func GetAllUsers(c *gin.Context) {
-	users := []entity.User{
-		{ID: 1, Email: "test@example.com", FIO: "Иванов И.И.", Role: enum.RoleClient},
+	rep := repositories.NewUserRepository()
+	users, err := rep.GetAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Не удалось получить пользователей",
+		})
+		return
 	}
 	c.JSON(http.StatusOK, users)
 }

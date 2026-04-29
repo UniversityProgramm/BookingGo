@@ -9,5 +9,5 @@ type User struct {
 	FIO       string    `json:"fio" db:"fio"`
 	Phone     string    `json:"phone" db:"phone"`
 	Role      string    `json:"role" db:"role"`
-	CreatedAt time.Time `json:"createdAt" db:"createdAt"`
+	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
