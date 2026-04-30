@@ -4,6 +4,8 @@ import (
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/repositories"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -72,7 +74,7 @@ func CreateUser(c *gin.Context) {
 		Password: createRequest.Password,
 		FIO:      createRequest.FIO,
 		Phone:    createRequest.Phone,
-		Role:     enum.RoleClient,
+		Role:     enum.RoleAdmin,
 	}
 
 	if err := userRep.Create(user); err != nil {
@@ -115,13 +117,45 @@ func UpdateUser(c *gin.Context) {
 	updatedUser, err := userRep.Update(userIdInt, &updateRequest)
 	if err != nil {
 		if err.Error() == "email is taken" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Email %s занят", updateRequest.Email)})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Email %s занят", updateRequest.Email),
+			})
 		} else if err.Error() == "user not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Пользователь с ID:%d не найден", userIdInt)})
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("Пользователь с ID:%d не найден", userIdInt),
+			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления пользователя"})
 		}
 		return
 	}
 	c.JSON(http.StatusOK, updatedUser)
+}
+
+// Сделать проверку роли с помощью JWT(только RoleAdmin может удалять)
+func DeleteUser(c *gin.Context) {
+	userID := c.Param("id")
+	userIDInt, err := strconv.Atoi(userID)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID должен быть числом",
+		})
+		return
+	}
+
+	err = userRep.Delete(userIDInt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": fmt.Sprintf("Пользователь с ID:%d не существует", userIDInt),
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("Ошибка при удалении пользователя с ID:%d", userIDInt),
+			})
+		}
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

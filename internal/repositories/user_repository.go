@@ -152,6 +152,20 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 	return &updated, nil
 }
 
+func (r *UserRepository) Delete(id int) error {
+	query := `DELETE FROM users WHERE id = $1`
+	commandTag, err := db.DB.Exec(context.Background(), query, id)
+
+	if err != nil {
+		return err
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *UserRepository) EmailExists(email string, excludeUserID int) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)`

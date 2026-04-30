@@ -14,5 +14,6 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/users/:id", handlers.GetUserByID)
 		api.POST("/users", handlers.CreateUser)
 		api.PUT("/users/:id", handlers.UpdateUser)
+		api.DELETE("/users/:id", handlers.DeleteUser)
 	}
 }
