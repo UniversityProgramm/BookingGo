@@ -5,6 +5,7 @@ import (
 	"BookingGo/pkg/db"
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 )
 
@@ -86,6 +87,74 @@ func (r *UserRepository) Create(user *entity.User) error {
 
 	if err != nil {
 		log.Printf("Ошибка при добавлении пользователя в БД: %v", err)
+		return nil
 	}
 	return err
+}
+
+func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (*entity.User, error) {
+	current, err := r.GetById(id)
+
+	if err != nil {
+		log.Printf("Ошибка при попытке обновить данные пользователя с ID:%d Error:%v", id, err)
+		return nil, err
+	}
+
+	newEmail := current.Email
+	newPassword := current.Password
+	newFIO := current.FIO
+	newPhone := current.Phone
+
+	if requestUser.Email != nil {
+		exists, err := r.EmailExists(*requestUser.Email, id)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, errors.New("email is taken")
+		}
+		newEmail = *requestUser.Email
+	}
+	if requestUser.Password != nil {
+		newPassword = *requestUser.Password
+	}
+	if requestUser.FIO != nil {
+		newFIO = *requestUser.FIO
+	}
+	if requestUser.Phone != nil {
+		newPhone = *requestUser.Phone
+	}
+
+	query := `
+		UPDATE users 
+		SET email = $1, password = $2, fio = $3, phone = $4
+		WHERE id = $5
+		RETURNING id, email, password, fio, phone, role, created_at`
+
+	row := db.DB.QueryRow(context.Background(), query,
+		newEmail,
+		newPassword,
+		newFIO,
+		newPhone,
+		id,
+	)
+
+	var updated entity.User
+
+	err = row.Scan(&updated.ID, &updated.Email, &updated.Password, &updated.FIO, &updated.Phone, &updated.Role, &updated.CreatedAt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return &updated, nil
+}
+
+func (r *UserRepository) EmailExists(email string, excludeUserID int) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)`
+	err := db.DB.QueryRow(context.Background(), query, email, excludeUserID).Scan(&exists)
+	return exists, err
 }

@@ -18,3 +18,10 @@ type CreateUserRequest struct {
 	FIO      string `json:"fio" binding:"required"`
 	Phone    string `json:"phone" binding:"required"`
 }
+
+type UpdateUserRequest struct {
+	Email    *string `json:"email" binding:"required"`
+	Password *string `json:"password" binding:"required"`
+	FIO      *string `json:"fio" binding:"required"`
+	Phone    *string `json:"phone" binding:"required"`
+}
