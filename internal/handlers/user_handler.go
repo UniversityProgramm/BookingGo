@@ -74,7 +74,7 @@ func CreateUser(c *gin.Context) {
 		Password: createRequest.Password,
 		FIO:      createRequest.FIO,
 		Phone:    createRequest.Phone,
-		Role:     enum.RoleAdmin,
+		Role:     enum.RoleClient,
 	}
 
 	if err := userRep.Create(user); err != nil {
