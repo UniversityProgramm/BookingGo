@@ -11,3 +11,10 @@ type User struct {
 	Role      string    `json:"role" db:"role"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
+
+type CreateUserRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	FIO      string `json:"fio" binding:"required"`
+	Phone    string `json:"phone" binding:"required"`
+}
