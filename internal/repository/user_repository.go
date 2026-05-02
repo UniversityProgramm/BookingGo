@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Репозиторий, в будущем можно добавить логгер, кэширование...
@@ -19,7 +21,7 @@ func NewUserRepository() *UserRepository {
 
 func (r *UserRepository) GetAll() ([]entity.User, error) {
 	query := `
-		SELECT id, email, password, fio, phone, role, created_at
+		SELECT id, email, password_hash, fio, phone, role, created_at, updated_at, is_active
 		FROM users
 		ORDER BY id`
 	rows, err := db.DB.Query(context.Background(), query)
@@ -34,8 +36,8 @@ func (r *UserRepository) GetAll() ([]entity.User, error) {
 	// Итерация по строкам
 	for rows.Next() {
 		var u entity.User
-		// Копируем данный из sql строки
-		err := rows.Scan(&u.ID, &u.Email, &u.Password, &u.FIO, &u.Phone, &u.Role, &u.CreatedAt)
+		// Копируем данные из sql строки
+		err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FIO, &u.Phone, &u.Role, &u.CreatedAt, &u.UpdatedAt, &u.IsActive)
 		if err != nil {
 			log.Printf("Ошибка при сканировании строки: %v", err)
 			return nil, err
@@ -52,13 +54,16 @@ func (r *UserRepository) GetAll() ([]entity.User, error) {
 
 func (r *UserRepository) GetById(id int) (*entity.User, error) {
 	query := `
-		SELECT id, email, password, fio, phone, role, created_at
+		SELECT id, email, password_hash, fio, phone, role, created_at, updated_at, is_active
 		FROM users
 		WHERE id = $1`
 
 	var user entity.User
 	// Получаем строку по sql запросу и копируем данные из нее
-	err := db.DB.QueryRow(context.Background(), query, id).Scan(&user.ID, &user.Email, &user.Password, &user.FIO, &user.Phone, &user.Role, &user.CreatedAt)
+	err := db.DB.QueryRow(context.Background(), query, id).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.FIO,
+		&user.Phone, &user.Role, &user.CreatedAt, &user.UpdatedAt, &user.IsActive,
+	)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -73,9 +78,9 @@ func (r *UserRepository) GetById(id int) (*entity.User, error) {
 
 func (r *UserRepository) Create(user *entity.User) error {
 	query := `
-		INSERT INTO users (email, password, fio, phone, role)
+		INSERT INTO users (email, password_hash, fio, phone, role, created_at, updated_at, is_active)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at`
+		RETURNING id, created_at, updated_at, is_active`
 
 	exists, err_ex := r.EmailExists(user.Email)
 
@@ -88,11 +93,11 @@ func (r *UserRepository) Create(user *entity.User) error {
 
 	err := db.DB.QueryRow(context.Background(), query,
 		user.Email,
-		user.Password,
+		user.PasswordHash,
 		user.FIO,
 		user.Phone,
 		user.Role,
-	).Scan(&user.ID, &user.CreatedAt)
+	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.IsActive)
 
 	if err != nil {
 		log.Printf("Ошибка при добавлении пользователя в БД: %v", err)
@@ -110,7 +115,7 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 	}
 
 	newEmail := current.Email
-	newPassword := current.Password
+	newPassword := current.PasswordHash
 	newFIO := current.FIO
 	newPhone := current.Phone
 
@@ -125,7 +130,11 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 		newEmail = *requestUser.Email
 	}
 	if requestUser.Password != nil {
-		newPassword = *requestUser.Password
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(*requestUser.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, err
+		}
+		newPassword = string(passwordHash)
 	}
 	if requestUser.FIO != nil {
 		newFIO = *requestUser.FIO
@@ -136,9 +145,9 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 
 	query := `
 		UPDATE users 
-		SET email = $1, password = $2, fio = $3, phone = $4
+		SET email = $1, password_hash = $2, fio = $3, phone = $4
 		WHERE id = $5
-		RETURNING id, email, password, fio, phone, role, created_at`
+		RETURNING id, email, password_hash, fio, phone, role, created_at, updated_at, is_active`
 
 	row := db.DB.QueryRow(context.Background(), query,
 		newEmail,
@@ -150,7 +159,9 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 
 	var updated entity.User
 
-	err = row.Scan(&updated.ID, &updated.Email, &updated.Password, &updated.FIO, &updated.Phone, &updated.Role, &updated.CreatedAt)
+	err = row.Scan(&updated.ID, &updated.Email, &updated.PasswordHash, &updated.FIO,
+		&updated.Phone, &updated.Role, &updated.CreatedAt, &updated.UpdatedAt, &updated.IsActive,
+	)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserController struct {
@@ -67,12 +68,18 @@ func (u UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(createRequest.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось хешировать пароль"})
+		return
+	}
+
 	user := &entity.User{
-		Email:    createRequest.Email,
-		Password: createRequest.Password,
-		FIO:      createRequest.FIO,
-		Phone:    createRequest.Phone,
-		Role:     enum.RoleClient,
+		Email:        createRequest.Email,
+		PasswordHash: string(passwordHash),
+		FIO:          createRequest.FIO,
+		Phone:        createRequest.Phone,
+		Role:         enum.RoleClient,
 	}
 
 	if err := u.userRepository.Create(user); err != nil {
