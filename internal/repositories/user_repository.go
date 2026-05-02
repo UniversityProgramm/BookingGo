@@ -83,7 +83,7 @@ func (r *UserRepository) Create(user *entity.User) error {
 		return err_ex
 	}
 	if exists {
-		return errors.New("email is taken")
+		return ErrEmailTaken
 	}
 
 	err := db.DB.QueryRow(context.Background(), query,
@@ -120,7 +120,7 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 			return nil, err
 		}
 		if exists {
-			return nil, errors.New("email is taken")
+			return nil, ErrEmailTaken
 		}
 		newEmail = *requestUser.Email
 	}
@@ -154,7 +154,7 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("user not found")
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}

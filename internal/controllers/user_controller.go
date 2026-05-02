@@ -76,7 +76,7 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if err := userRep.Create(user); err != nil {
-		if err.Error() == "email is taken" {
+		if errors.Is(err, repositories.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Пользователь с таким email уже существует",
 			})
@@ -113,11 +113,11 @@ func UpdateUser(c *gin.Context) {
 
 	updatedUser, err := userRep.Update(userIdInt, &updateRequest)
 	if err != nil {
-		if err.Error() == "email is taken" {
+		if errors.Is(err, repositories.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Этот Email занят",
 			})
-		} else if err.Error() == "user not found" {
+		} else if errors.Is(err, repositories.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
