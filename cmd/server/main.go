@@ -11,13 +11,23 @@ import (
 )
 
 func main() {
-	godotenv.Load()
-	dbUrl := os.Getenv("DB_URL")
+	loadErr := godotenv.Load()
+	if loadErr != nil {
+		log.Fatal("Error loading .env file")
+	}
 
+	dbUrl := os.Getenv("DB_URL")
 	if dbUrl == "" {
 		log.Fatal("DB_URl в .env не задан")
 	}
-	db.InitDB(dbUrl)
+
+	err := db.InitDB(dbUrl)
+	if err != nil {
+		log.Fatal("Ошибка при подключении к БД:", err)
+	}
+
+	log.SetOutput(os.Stdout)
+	log.Println("Подключились к базе PostgreSQL")
 
 	router := gin.Default()
 	controllers.SetupRoutes(router)
