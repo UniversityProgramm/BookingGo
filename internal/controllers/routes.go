@@ -8,10 +8,13 @@ import (
 func SetupRoutes(r *gin.Engine) {
 	api := r.Group("/api")
 	{
-		api.GET("/users", GetAllUsers)
-		api.GET("/users/:id", GetUserByID)
-		api.POST("/users", CreateUser)
-		api.PUT("/users/:id", UpdateUser)
-		api.DELETE("/users/:id", DeleteUser)
+		usersGroup := api.Group("/users")
+		{
+			usersGroup.GET("/users", GetAllUsers)
+			usersGroup.GET("/users/:id", GetUserByID)
+			usersGroup.POST("/users", CreateUser)
+			usersGroup.PUT("/users/:id", UpdateUser)
+			usersGroup.DELETE("/users/:id", DeleteUser)
+		}
 	}
 }
