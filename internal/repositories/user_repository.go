@@ -77,6 +77,15 @@ func (r *UserRepository) Create(user *entity.User) error {
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at`
 
+	exists, err_ex := r.EmailExists(user.Email)
+
+	if err_ex != nil {
+		return err_ex
+	}
+	if exists {
+		return errors.New("email is taken")
+	}
+
 	err := db.DB.QueryRow(context.Background(), query,
 		user.Email,
 		user.Password,
@@ -87,9 +96,9 @@ func (r *UserRepository) Create(user *entity.User) error {
 
 	if err != nil {
 		log.Printf("Ошибка при добавлении пользователя в БД: %v", err)
-		return nil
+		return err
 	}
-	return err
+	return nil
 }
 
 func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (*entity.User, error) {
@@ -106,7 +115,7 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 	newPhone := current.Phone
 
 	if requestUser.Email != nil {
-		exists, err := r.EmailExists(*requestUser.Email, id)
+		exists, err := r.EmailExists(*requestUser.Email)
 		if err != nil {
 			return nil, err
 		}
@@ -166,9 +175,9 @@ func (r *UserRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *UserRepository) EmailExists(email string, excludeUserID int) (bool, error) {
+func (r *UserRepository) EmailExists(email string) (bool, error) {
 	var exists bool
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)`
-	err := db.DB.QueryRow(context.Background(), query, email, excludeUserID).Scan(&exists)
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+	err := db.DB.QueryRow(context.Background(), query, email).Scan(&exists)
 	return exists, err
 }

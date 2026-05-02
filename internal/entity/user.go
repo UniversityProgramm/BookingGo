@@ -1,6 +1,9 @@
 package entity
 
-import "time"
+import (
+	"BookingGo/internal/enum"
+	"time"
+)
 
 type User struct {
 	ID        int       `json:"id" db:"id"`
@@ -8,7 +11,7 @@ type User struct {
 	Password  string    `json:"password" db:"password"`
 	FIO       string    `json:"fio" db:"fio"`
 	Phone     string    `json:"phone" db:"phone"`
-	Role      string    `json:"role" db:"role"`
+	Role      enum.Role `json:"role" db:"role"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
 

@@ -6,10 +6,8 @@ import (
 	"BookingGo/internal/repositories"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,14 +42,14 @@ func GetUserByID(c *gin.Context) {
 	user, err := userRep.GetById(userIdInt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprint("Не удалось получить пользователя с id:", userId),
+			"error": "Не удалось получить пользователя с таким ID",
 		})
 		return
 	}
 
 	if user == nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": fmt.Sprintf("Пользователь с ID %d не найден", userIdInt),
+			"error": "Пользователь с таким ID не найден",
 		})
 		return
 	}
@@ -78,8 +76,7 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if err := userRep.Create(user); err != nil {
-		if strings.Contains(err.Error(), "Duplicate entry") ||
-			strings.Contains(err.Error(), "Duplicate key") {
+		if err.Error() == "email is taken" {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Пользователь с таким email уже существует",
 			})
@@ -118,11 +115,11 @@ func UpdateUser(c *gin.Context) {
 	if err != nil {
 		if err.Error() == "email is taken" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("Email %s занят", updateRequest.Email),
+				"error": "Этот Email занят",
 			})
 		} else if err.Error() == "user not found" {
 			c.JSON(http.StatusNotFound, gin.H{
-				"error": fmt.Sprintf("Пользователь с ID:%d не найден", userIdInt),
+				"error": "Пользователь с таким ID не найден",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления пользователя"})
@@ -148,11 +145,11 @@ func DeleteUser(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{
-				"error": fmt.Sprintf("Пользователь с ID:%d не существует", userIDInt),
+				"error": "Пользователь с таким ID не существует",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Sprintf("Ошибка при удалении пользователя с ID:%d", userIDInt),
+				"error": "Ошибка при удалении пользователя",
 			})
 		}
 		return

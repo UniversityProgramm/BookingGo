@@ -1,7 +1,9 @@
 package enum
 
+type Role string
+
 const (
-	RoleClient = "client"
-	RoleStaff  = "staff"
-	RoleAdmin  = "admin"
+	RoleClient Role = "client"
+	RoleStaff  Role = "staff"
+	RoleAdmin  Role = "admin"
 )
