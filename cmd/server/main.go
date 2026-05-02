@@ -1,7 +1,8 @@
 package main
 
 import (
-	"BookingGo/internal/controllers"
+	"BookingGo/internal/controller"
+	"BookingGo/internal/repository"
 	"BookingGo/pkg/db"
 	"log"
 	"os"
@@ -25,18 +26,18 @@ func main() {
 	if err != nil {
 		log.Fatal("Ошибка при подключении к БД:", err)
 	}
-
 	log.SetOutput(os.Stdout)
 	log.Println("Подключились к базе PostgreSQL")
 
+	// Роутеризация запросов
 	router := gin.Default()
-	controllers.SetupRoutes(router)
+	userRepo := repository.NewUserRepository()
+	controller.SetupRoutes(router, userRepo)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
 		port = "8080"
 	}
-
 	log.SetOutput(os.Stdout)
 	log.Printf("\n\nСервер запущен на порте %s\n\n", port)
 	if err := router.Run(":" + port); err != nil {

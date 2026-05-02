@@ -1,9 +1,9 @@
-package controllers
+package controller
 
 import (
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"BookingGo/internal/repositories"
+	"BookingGo/internal/repository"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -12,12 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var userRep = repositories.NewUserRepository()
+type UserController struct {
+	userRepository repository.UserRepository
+}
 
-// Методы для эндпоинтов
-
-func GetAllUsers(c *gin.Context) {
-	users, err := userRep.GetAll()
+func (u UserController) GetAllUsers(c *gin.Context) {
+	users, err := u.userRepository.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось получить пользователей",
@@ -28,7 +28,7 @@ func GetAllUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-func GetUserByID(c *gin.Context) {
+func (u UserController) GetUserByID(c *gin.Context) {
 	userId := c.Param("id")
 	userIdInt, err := strconv.Atoi(userId)
 
@@ -39,7 +39,7 @@ func GetUserByID(c *gin.Context) {
 		return
 	}
 
-	user, err := userRep.GetById(userIdInt)
+	user, err := u.userRepository.GetById(userIdInt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось получить пользователя с таким ID",
@@ -57,7 +57,7 @@ func GetUserByID(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func CreateUser(c *gin.Context) {
+func (u UserController) CreateUser(c *gin.Context) {
 	var createRequest entity.CreateUserRequest
 
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
@@ -75,8 +75,8 @@ func CreateUser(c *gin.Context) {
 		Role:     enum.RoleClient,
 	}
 
-	if err := userRep.Create(user); err != nil {
-		if errors.Is(err, repositories.ErrEmailTaken) {
+	if err := u.userRepository.Create(user); err != nil {
+		if errors.Is(err, repository.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Пользователь с таким email уже существует",
 			})
@@ -91,7 +91,7 @@ func CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-func UpdateUser(c *gin.Context) {
+func (u UserController) UpdateUser(c *gin.Context) {
 	userId := c.Param("id")
 	userIdInt, err := strconv.Atoi(userId)
 
@@ -111,13 +111,13 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := userRep.Update(userIdInt, &updateRequest)
+	updatedUser, err := u.userRepository.Update(userIdInt, &updateRequest)
 	if err != nil {
-		if errors.Is(err, repositories.ErrEmailTaken) {
+		if errors.Is(err, repository.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Этот Email занят",
 			})
-		} else if errors.Is(err, repositories.ErrUserNotFound) {
+		} else if errors.Is(err, repository.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
@@ -130,7 +130,7 @@ func UpdateUser(c *gin.Context) {
 }
 
 // Сделать проверку роли с помощью JWT(только RoleAdmin может удалять)
-func DeleteUser(c *gin.Context) {
+func (u UserController) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
 	userIDInt, err := strconv.Atoi(userID)
 
@@ -141,7 +141,7 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = userRep.Delete(userIDInt)
+	err = u.userRepository.Delete(userIDInt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{
