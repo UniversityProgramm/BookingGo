@@ -8,4 +8,5 @@ type Notification struct {
 	RecipientID int       `json:"recipientId" db:"recipientId"`
 	IsRead      bool      `json:"isRead" db:"isRead"`
 	CreatedAt   time.Time `json:"createdAt" db:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt" db:"updatedAt"`
 }

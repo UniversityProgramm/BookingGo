@@ -9,4 +9,5 @@ type Booking struct {
 	Status             string    `json:"status" db:"status"`
 	ProblemDescription string    `json:"problem" db:"problem"`
 	CreatedAt          time.Time `json:"createdAt" db:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt" db:"updatedAt"`
 }
