@@ -1,7 +1,7 @@
 package main
 
 import (
-	"BookingGo/internal/routes"
+	"BookingGo/internal/controllers"
 	"BookingGo/pkg/db"
 	"log"
 	"os"
@@ -20,7 +20,7 @@ func main() {
 	db.InitDB(dbUrl)
 
 	router := gin.Default()
-	routes.SetupRoutes(router)
+	controllers.SetupRoutes(router)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
