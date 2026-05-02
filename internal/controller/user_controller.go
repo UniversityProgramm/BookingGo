@@ -6,6 +6,7 @@ import (
 	"BookingGo/internal/repository"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -63,7 +64,7 @@ func (u UserController) CreateUser(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Неверный формат данных",
+			"error": fmt.Sprint("Неверный формат данных", err.Error()),
 		})
 		return
 	}
@@ -113,7 +114,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Неверный формат данных",
+			"error": fmt.Sprint("Неверный формат данных", err.Error()),
 		})
 		return
 	}

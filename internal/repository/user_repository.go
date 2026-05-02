@@ -78,7 +78,7 @@ func (r *UserRepository) GetById(id int) (*entity.User, error) {
 
 func (r *UserRepository) Create(user *entity.User) error {
 	query := `
-		INSERT INTO users (email, password_hash, fio, phone, role, created_at, updated_at, is_active)
+		INSERT INTO users (email, password_hash, fio, phone, role)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at, updated_at, is_active`
 
