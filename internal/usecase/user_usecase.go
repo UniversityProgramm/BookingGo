@@ -120,9 +120,12 @@ func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 }
 
 func (u *UserUsecase) DeleteUser(id int) error {
-	if err := u.userRepository.Delete(id); err != nil {
+	err := u.userRepository.Delete(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
 		return err
 	}
-
 	return nil
 }
