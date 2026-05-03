@@ -6,15 +6,15 @@ import (
 )
 
 type User struct {
-	ID           int       `json:"id" db:"id"`
-	Email        string    `json:"email" db:"email"`
-	PasswordHash string    `json:"-" db:"password_hash"`
-	FIO          string    `json:"fio" db:"fio"`
-	Phone        string    `json:"phone" db:"phone"`
-	Role         enum.Role `json:"role" db:"role"`
-	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
-	UpdatedAt    time.Time `json:"updatedAt" db:"updated_at"`
-	IsActive     bool      `json:"isActive" db:"is_active"`
+	ID           int       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
+	PasswordHash string    `gorm:"not null" json:"-"`
+	FIO          string    `json:"fio"`
+	Phone        string    `gorm:"not null" json:"phone"`
+	Role         enum.Role `gorm:"not null" json:"role"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	IsActive     bool      `json:"is_active"`
 }
 
 type CreateUserRequest struct {

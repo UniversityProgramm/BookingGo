@@ -17,14 +17,9 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	dbUrl := os.Getenv("DB_URL")
-	if dbUrl == "" {
-		log.Fatal("DB_URl в .env не задан")
-	}
-
-	err := db.InitDB(dbUrl)
+	err := db.InitDB()
 	if err != nil {
-		log.Fatal("Ошибка при подключении к БД:", err)
+		log.Fatal("Ошибка при подключении к БД:", err.Error())
 	}
 	log.SetOutput(os.Stdout)
 	log.Println("Подключились к базе PostgreSQL")

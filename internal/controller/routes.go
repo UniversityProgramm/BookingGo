@@ -15,6 +15,7 @@ func SetupRoutes(r *gin.Engine, userRep *repository.UserRepository) {
 		{
 			usersGroup.GET("", userController.GetAllUsers)
 			usersGroup.GET("/:id", userController.GetUserByID)
+			usersGroup.GET("/email/:email", userController.GetUserByEmail)
 			usersGroup.POST("", userController.CreateUser)
 			usersGroup.PUT("/:id", userController.UpdateUser)
 			usersGroup.DELETE("/:id", userController.DeleteUser)

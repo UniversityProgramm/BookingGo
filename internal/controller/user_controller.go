@@ -4,7 +4,6 @@ import (
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/repository"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -43,16 +42,31 @@ func (u UserController) GetUserByID(c *gin.Context) {
 
 	user, err := u.userRepository.GetById(userIdInt)
 	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Пользователь с таким ID не найден",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Не удалось получить пользователя с таким ID",
+			"error": "Не удалось получить пользователя",
 		})
 		return
 	}
 
-	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Пользователь с таким ID не найден",
-		})
+	c.JSON(http.StatusOK, user)
+}
+
+func (u UserController) GetUserByEmail(c *gin.Context) {
+	email := c.Param("email")
+	user, err := u.userRepository.GetByEmail(email)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Пользователь с таким Email не найден",
+			})
+			return
+		}
 		return
 	}
 
@@ -71,7 +85,9 @@ func (u UserController) CreateUser(c *gin.Context) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(createRequest.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось хешировать пароль"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Не удалось хешировать пароль",
+		})
 		return
 	}
 
@@ -84,12 +100,6 @@ func (u UserController) CreateUser(c *gin.Context) {
 	}
 
 	if err := u.userRepository.Create(user); err != nil {
-		if errors.Is(err, repository.ErrEmailTaken) {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Пользователь с таким email уже существует",
-			})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось создать пользователя",
 		})
@@ -134,6 +144,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		}
 		return
 	}
+
 	c.JSON(http.StatusOK, updatedUser)
 }
 
@@ -151,9 +162,9 @@ func (u UserController) DeleteUser(c *gin.Context) {
 
 	err = u.userRepository.Delete(userIDInt)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Пользователь с таким ID не существует",
+				"error": "Пользователь с таким ID не найден",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -162,5 +173,6 @@ func (u UserController) DeleteUser(c *gin.Context) {
 		}
 		return
 	}
+
 	c.Status(http.StatusNoContent)
 }

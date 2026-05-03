@@ -1,24 +1,26 @@
 package db
 
 import (
-	"context"
+	"errors"
+	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // Пул подключений к БД
-var DB *pgxpool.Pool
+var DB *gorm.DB
 
-func InitDB(dbUrl string) error {
+func InitDB() error {
+	dbUrl := os.Getenv("DB_URL")
+	if dbUrl == "" {
+		return errors.New("env DB_URL is not set")
+	}
+
 	var err error
-	DB, err = pgxpool.New(context.Background(), dbUrl)
+	DB, err = gorm.Open(postgres.Open(dbUrl), &gorm.Config{})
 	if err != nil {
 		return err
 	}
-
-	if err := DB.Ping(context.Background()); err != nil {
-		return err
-	}
-
 	return nil
 }
