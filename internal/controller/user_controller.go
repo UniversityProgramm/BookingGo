@@ -2,23 +2,25 @@ package controller
 
 import (
 	"BookingGo/internal/entity"
-	"BookingGo/internal/enum"
-	"BookingGo/internal/repository"
+	"BookingGo/internal/usecase"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserController struct {
-	userRepository repository.UserRepository
+	userUsecase *usecase.UserUsecase
+}
+
+func NewUserController(userUsecase *usecase.UserUsecase) *UserController {
+	return &UserController{userUsecase: userUsecase}
 }
 
 func (u UserController) GetAllUsers(c *gin.Context) {
-	users, err := u.userRepository.GetAll()
+	users, err := u.userUsecase.GetAllUsers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось получить пользователей",
@@ -30,9 +32,7 @@ func (u UserController) GetAllUsers(c *gin.Context) {
 }
 
 func (u UserController) GetUserByID(c *gin.Context) {
-	userId := c.Param("id")
-	userIdInt, err := strconv.Atoi(userId)
-
+	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID должен быть числом",
@@ -40,17 +40,17 @@ func (u UserController) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	user, err := u.userRepository.GetById(userIdInt)
+	user, err := u.userUsecase.GetUserByID(userId)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, usecase.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
-			return
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Не удалось получить пользователя по ID",
+			})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Не удалось получить пользователя",
-		})
 		return
 	}
 
@@ -58,14 +58,16 @@ func (u UserController) GetUserByID(c *gin.Context) {
 }
 
 func (u UserController) GetUserByEmail(c *gin.Context) {
-	email := c.Param("email")
-	user, err := u.userRepository.GetByEmail(email)
+	user, err := u.userUsecase.GetUserByEmail(c.Param("email"))
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, usecase.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким Email не найден",
 			})
-			return
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Не удалось получить пользователя по Email по ID",
+			})
 		}
 		return
 	}
@@ -75,7 +77,6 @@ func (u UserController) GetUserByEmail(c *gin.Context) {
 
 func (u UserController) CreateUser(c *gin.Context) {
 	var createRequest entity.CreateUserRequest
-
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprint("Неверный формат данных", err.Error()),
@@ -83,23 +84,8 @@ func (u UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(createRequest.Password), bcrypt.DefaultCost)
+	user, err := u.userUsecase.CreateUser(&createRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Не удалось хешировать пароль",
-		})
-		return
-	}
-
-	user := &entity.User{
-		Email:        createRequest.Email,
-		PasswordHash: string(passwordHash),
-		FIO:          createRequest.FIO,
-		Phone:        createRequest.Phone,
-		Role:         enum.RoleClient,
-	}
-
-	if err := u.userRepository.Create(user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось создать пользователя",
 		})
@@ -110,9 +96,7 @@ func (u UserController) CreateUser(c *gin.Context) {
 }
 
 func (u UserController) UpdateUser(c *gin.Context) {
-	userId := c.Param("id")
-	userIdInt, err := strconv.Atoi(userId)
-
+	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID должен быть числом",
@@ -121,7 +105,6 @@ func (u UserController) UpdateUser(c *gin.Context) {
 	}
 
 	var updateRequest entity.UpdateUserRequest
-
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprint("Неверный формат данных", err.Error()),
@@ -129,13 +112,13 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := u.userRepository.Update(userIdInt, &updateRequest)
+	updatedUser, err := u.userUsecase.UpdateUser(userId, &updateRequest)
 	if err != nil {
-		if errors.Is(err, repository.ErrEmailTaken) {
+		if errors.Is(err, usecase.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Этот Email занят",
 			})
-		} else if errors.Is(err, repository.ErrUserNotFound) {
+		} else if errors.Is(err, usecase.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
@@ -150,9 +133,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 
 // Сделать проверку роли с помощью JWT(только RoleAdmin может удалять)
 func (u UserController) DeleteUser(c *gin.Context) {
-	userID := c.Param("id")
-	userIDInt, err := strconv.Atoi(userID)
-
+	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID должен быть числом",
@@ -160,9 +141,9 @@ func (u UserController) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = u.userRepository.Delete(userIDInt)
+	err = u.userUsecase.DeleteUser(userID)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, usecase.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})

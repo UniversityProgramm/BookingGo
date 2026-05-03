@@ -3,6 +3,7 @@ package main
 import (
 	"BookingGo/internal/controller"
 	"BookingGo/internal/repository"
+	"BookingGo/internal/usecase"
 	"BookingGo/pkg/db"
 	"log"
 	"os"
@@ -27,7 +28,8 @@ func main() {
 	// Роутеризация запросов
 	router := gin.Default()
 	userRepo := repository.NewUserRepository()
-	controller.SetupRoutes(router, userRepo)
+	userUsecase := usecase.NewUserUsecase(userRepo)
+	controller.SetupRoutes(router, userUsecase)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

@@ -4,16 +4,17 @@ import (
 	"BookingGo/internal/entity"
 	"BookingGo/pkg/db"
 	"errors"
-	"log"
 
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-// Репозиторий, в будущем можно добавить логгер, кэширование...
+var (
+	ErrEmailTaken   = errors.New("user not found")
+	ErrUserNotFound = errors.New("email is taken")
+)
+
 type UserRepository struct{}
 
-// Конструктор
 func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
@@ -24,7 +25,7 @@ func (r *UserRepository) GetAll() ([]entity.User, error) {
 	return users, result.Error
 }
 
-func (r *UserRepository) GetById(id int) (*entity.User, error) {
+func (r *UserRepository) GetByID(id int) (*entity.User, error) {
 	var user entity.User
 	result := db.DB.First(&user, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -55,39 +56,8 @@ func (r *UserRepository) Create(user *entity.User) error {
 	return result.Error
 }
 
-func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (*entity.User, error) {
-	_, err := r.GetById(id)
-	if err != nil {
-		log.Println("Ошибка при попытке обновить данные пользователя, пользователь не найден")
-		return nil, err
-	}
-
-	updates := map[string]interface{}{}
-	if requestUser.Email != nil {
-		exists, err := r.EmailExists(*requestUser.Email)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			return nil, ErrEmailTaken
-		}
-		updates["email"] = *requestUser.Email
-	}
-	if requestUser.Password != nil {
-		passwordHash, err := bcrypt.GenerateFromPassword([]byte(*requestUser.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return nil, err
-		}
-		updates["password_hash"] = string(passwordHash)
-	}
-	if requestUser.FIO != nil {
-		updates["fio"] = *requestUser.FIO
-	}
-	if requestUser.Phone != nil {
-		updates["phone"] = *requestUser.Phone
-	}
-
-	result := db.DB.Model(&entity.User{}).Where("id = ?", id).Updates(updates)
+func (r *UserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
+	result := db.DB.Model(&entity.User{}).Where("id = ?", id).Updates(requestUser)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -95,7 +65,7 @@ func (r *UserRepository) Update(id int, requestUser *entity.UpdateUserRequest) (
 		return nil, ErrUserNotFound
 	}
 
-	return r.GetById(id)
+	return r.GetByID(id)
 }
 
 func (r *UserRepository) Delete(id int) error {

@@ -1,15 +1,15 @@
 package controller
 
 import (
-	"BookingGo/internal/repository"
+	"BookingGo/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userRep *repository.UserRepository) {
+func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase) {
 	api := r.Group("/api")
-	userController := UserController{userRepository: *userRep}
+	userController := NewUserController(userUsecase)
 	{
 		usersGroup := api.Group("/users")
 		{
