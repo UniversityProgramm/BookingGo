@@ -109,3 +109,34 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updatedUser)
 }
+
+func (ac *AuthController) ChangePassword(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	userID := currentUser.UserID
+	var req entity.ChangePasswordRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
+		return
+	}
+
+	err := ac.authUsecase.ChangePassword(userID, &req)
+	if err != nil {
+		if errors.Is(err, usecase.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		} else if errors.Is(err, usecase.ErrCurPasswordIsNotCorrect) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
+		} else if errors.Is(err, usecase.ErrSamePassword) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Новый пароль совпадает с текущим"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены пароля"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Пароль успешно изменен"})
+}

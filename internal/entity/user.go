@@ -25,8 +25,11 @@ type CreateUserRequest struct {
 }
 
 type UpdateUserRequest struct {
-	Email    *string `json:"email"`
-	Password *string `json:"password"`
-	FIO      *string `json:"fio"`
-	Phone    *string `json:"phone"`
+	FIO   *string `json:"fio"`
+	Phone *string `json:"phone"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"cur_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=20"`
 }

@@ -23,6 +23,7 @@ func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *u
 	{
 		protectedGroup.GET("", authController.GetMe)
 		protectedGroup.PUT("", authController.UpdateMe)
+		protectedGroup.PUT("/changePassword", authController.ChangePassword)
 	}
 
 	adminGroup := api.Group("")

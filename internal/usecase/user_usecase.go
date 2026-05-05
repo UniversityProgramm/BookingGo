@@ -95,23 +95,6 @@ func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 	}
 
 	updates := map[string]interface{}{}
-	if req.Email != nil {
-		exists, err := u.userRepo.EmailExists(*req.Email)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			return nil, ErrEmailTaken
-		}
-		updates["email"] = *req.Email
-	}
-	if req.Password != nil {
-		passwordHash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return nil, err
-		}
-		updates["password_hash"] = string(passwordHash)
-	}
 	if req.FIO != nil {
 		updates["fio"] = *req.FIO
 	}
