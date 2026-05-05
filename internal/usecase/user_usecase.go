@@ -79,6 +79,7 @@ func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 		FIO:          req.FIO,
 		Phone:        req.Phone,
 		Role:         enum.RoleClient,
+		IsActive:     true,
 	}
 
 	if err := u.userRepo.Create(user); err != nil {
