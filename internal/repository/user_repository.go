@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	ErrEmailTaken   = errors.New("user not found")
 	ErrUserNotFound = errors.New("email is taken")
 )
 

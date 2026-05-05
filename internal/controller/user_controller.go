@@ -2,6 +2,8 @@ package controller
 
 import (
 	"BookingGo/internal/entity"
+	"BookingGo/internal/enum"
+	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
 	"fmt"
@@ -131,8 +133,18 @@ func (u UserController) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedUser)
 }
 
-// Сделать проверку роли с помощью JWT(только RoleAdmin может удалять)
 func (u UserController) DeleteUser(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	if currentUser.Role != enum.RoleAdmin {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Доступ запрещен"})
+		return
+	}
+
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

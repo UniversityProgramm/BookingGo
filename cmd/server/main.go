@@ -1,6 +1,7 @@
 package main
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/controller"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
@@ -13,10 +14,11 @@ import (
 )
 
 func main() {
-	loadErr := godotenv.Load()
-	if loadErr != nil {
+	if loadErr := godotenv.Load(); loadErr != nil {
 		log.Fatal("Error loading .env file")
 	}
+
+	auth.InitAuth()
 
 	err := db.InitDB()
 	if err != nil {
@@ -29,7 +31,8 @@ func main() {
 	router := gin.Default()
 	userRepo := repository.NewUserRepository()
 	userUsecase := usecase.NewUserUsecase(userRepo)
-	controller.SetupRoutes(router, userUsecase)
+	authUsecase := usecase.NewAuthUsecase(userUsecase)
+	controller.SetupRoutes(router, userUsecase, authUsecase)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

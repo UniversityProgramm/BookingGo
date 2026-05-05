@@ -25,23 +25,31 @@ type UserRepository interface {
 }
 
 type UserUsecase struct {
-	userRepository UserRepository
+	userRepo UserRepository
 }
 
 func NewUserUsecase(userRepository UserRepository) *UserUsecase {
-	return &UserUsecase{userRepository: userRepository}
+	return &UserUsecase{userRepo: userRepository}
 }
 
 func (u *UserUsecase) GetAllUsers() ([]entity.User, error) {
-	return u.userRepository.GetAll()
+	return u.userRepo.GetAll()
 }
 
 func (u *UserUsecase) GetUserByID(id int) (*entity.User, error) {
-	return u.userRepository.GetByID(id)
+	user, err := u.userRepo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (u *UserUsecase) GetUserByEmail(email string) (*entity.User, error) {
-	user, err := u.userRepository.GetByEmail(email)
+	user, err := u.userRepo.GetByEmail(email)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return nil, ErrUserNotFound
@@ -52,7 +60,7 @@ func (u *UserUsecase) GetUserByEmail(email string) (*entity.User, error) {
 }
 
 func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
-	exists, err := u.userRepository.EmailExists(req.Email)
+	exists, err := u.userRepo.EmailExists(req.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +81,7 @@ func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 		Role:         enum.RoleClient,
 	}
 
-	if err := u.userRepository.Create(user); err != nil {
+	if err := u.userRepo.Create(user); err != nil {
 		return nil, err
 	}
 
@@ -81,14 +89,14 @@ func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 }
 
 func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
-	_, err := u.userRepository.GetByID(id)
+	_, err := u.userRepo.GetByID(id)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
 	updates := map[string]interface{}{}
 	if req.Email != nil {
-		exists, err := u.userRepository.EmailExists(*req.Email)
+		exists, err := u.userRepo.EmailExists(*req.Email)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +119,7 @@ func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 		updates["phone"] = *req.Phone
 	}
 
-	user, err := u.userRepository.Update(id, updates)
+	user, err := u.userRepo.Update(id, updates)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +128,7 @@ func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 }
 
 func (u *UserUsecase) DeleteUser(id int) error {
-	err := u.userRepository.Delete(id)
+	err := u.userRepo.Delete(id)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
 			return ErrUserNotFound
