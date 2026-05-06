@@ -12,8 +12,8 @@ type User struct {
 	FIO          string    `json:"fio"`
 	Phone        string    `gorm:"not null" json:"phone"`
 	Role         enum.Role `gorm:"not null" json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	CreatedAt    time.Time `json:"created_at" gorm:"not null;autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"not null;autoUpdateTime"`
 	IsActive     bool      `json:"is_active"`
 }
 

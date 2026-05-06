@@ -2,13 +2,14 @@ package controller
 
 import (
 	"BookingGo/internal/middleware"
+	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *usecase.AuthUsecase) {
+func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *usecase.AuthUsecase, userRepo *repository.UserRepository) {
 	api := r.Group("/api")
 
 	authController := NewAuthController(authUsecase)
@@ -23,7 +24,17 @@ func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *u
 	{
 		protectedGroup.GET("", authController.GetMe)
 		protectedGroup.PUT("", authController.UpdateMe)
-		protectedGroup.PUT("/changePassword", authController.ChangePassword)
+		protectedGroup.PUT("/password", authController.ChangePassword)
+	}
+
+	bookingRepo := repository.NewBookingRepository()
+	bookingUsecase := usecase.NewBookingUsecase(bookingRepo, userRepo)
+	bookingController := NewBookingController(bookingUsecase)
+	bookingGroup := protectedGroup.Group("/bookings")
+	{
+		bookingGroup.GET("", bookingController.GetMyBookings)
+		bookingGroup.POST("", bookingController.CreateBooking)
+		bookingGroup.DELETE("/:id", bookingController.DeleteBooking)
 	}
 
 	adminGroup := api.Group("")

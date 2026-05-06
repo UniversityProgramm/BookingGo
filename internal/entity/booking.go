@@ -3,11 +3,17 @@ package entity
 import "time"
 
 type Booking struct {
-	ID                 int       `json:"id" db:"id"`
-	UserID             int       `json:"userId" db:"user_id"`
-	SlotStart          time.Time `json:"slotStart" db:"slot_start"`
-	Status             string    `json:"status" db:"status"`
-	ProblemDescription string    `json:"problem" db:"problem"`
-	CreatedAt          time.Time `json:"createdAt" db:"createdAt"`
-	UpdatedAt          time.Time `json:"updatedAt" db:"updatedAt"`
+	ID                 int       `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID             int       `json:"user_id" gorm:"not null"`
+	SlotStart          time.Time `json:"slot_start" gorm:"not null"`
+	SlotEnd            time.Time `json:"slot_end" gorm:"not null"`
+	Status             string    `json:"status" gorm:"not null"`
+	ProblemDescription string    `json:"problem_description" gorm:"not null"`
+	CreatedAt          time.Time `json:"created_at" gorm:"not null;autoCreateTime"`
+	UpdatedAt          time.Time `json:"updated_at" gorm:"not null;autoUpdateTime"`
+}
+
+type CreateBookingRequest struct {
+	SlotStart          time.Time `json:"slot_start" binding:"required"`
+	ProblemDescription string    `json:"problem_description" binding:"required"`
 }

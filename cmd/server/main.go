@@ -32,7 +32,7 @@ func main() {
 	userRepo := repository.NewUserRepository()
 	userUsecase := usecase.NewUserUsecase(userRepo)
 	authUsecase := usecase.NewAuthUsecase(userUsecase)
-	controller.SetupRoutes(router, userUsecase, authUsecase)
+	controller.SetupRoutes(router, userUsecase, authUsecase, userRepo)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
