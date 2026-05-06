@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
@@ -11,11 +12,11 @@ import (
 )
 
 type AuthController struct {
-	authUsecase *usecase.AuthUsecase
+	authUseCase *usecase.AuthUseCase
 }
 
-func NewAuthController(authUsec *usecase.AuthUsecase) *AuthController {
-	return &AuthController{authUsecase: authUsec}
+func NewAuthController(authUsec *usecase.AuthUseCase) *AuthController {
+	return &AuthController{authUseCase: authUsec}
 }
 
 func (ac *AuthController) Login(c *gin.Context) {
@@ -29,11 +30,11 @@ func (ac *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := ac.authUsecase.Login(req.Email, req.Password)
+	token, err := ac.authUseCase.Login(req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, usecase.ErrInvalidEmail) {
+		if errors.Is(err, domain.ErrInvalidEmail) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email"})
-		} else if errors.Is(err, usecase.ErrInvalidPassword) {
+		} else if errors.Is(err, domain.ErrInvalidPassword) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный пароль"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка входа"})
@@ -50,9 +51,9 @@ func (ac *AuthController) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 	}
 
-	token, err := ac.authUsecase.Register(&req)
+	token, err := ac.authUseCase.Register(&req)
 	if err != nil {
-		if errors.Is(err, usecase.ErrEmailTaken) {
+		if errors.Is(err, domain.ErrEmailTaken) {
 			c.JSON(http.StatusOK, gin.H{"error": "Этот Email занят"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка регистрации"})
@@ -70,9 +71,9 @@ func (ac *AuthController) GetMe(c *gin.Context) {
 		return
 	}
 
-	user, err := ac.authUsecase.GetUserByID(currentUser.UserID)
+	user, err := ac.authUseCase.GetUserByID(currentUser.UserID)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка загрузки профиля"})
@@ -95,11 +96,11 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := ac.authUsecase.UpdateUser(userID, &req)
+	updatedUser, err := ac.authUseCase.UpdateUser(userID, &req)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
-		} else if errors.Is(err, usecase.ErrEmailTaken) {
+		} else if errors.Is(err, domain.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Email уже занят"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления данных профиля"})
@@ -124,13 +125,13 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	err := ac.authUsecase.ChangePassword(userID, &req)
+	err := ac.authUseCase.ChangePassword(userID, &req)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
-		} else if errors.Is(err, usecase.ErrCurPasswordIsNotCorrect) {
+		} else if errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
-		} else if errors.Is(err, usecase.ErrSamePassword) {
+		} else if errors.Is(err, domain.ErrSamePassword) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Новый пароль совпадает с текущим"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены пароля"})

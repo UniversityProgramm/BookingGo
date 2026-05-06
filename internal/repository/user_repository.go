@@ -1,15 +1,12 @@
 package repository
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/pkg/db"
 	"errors"
 
 	"gorm.io/gorm"
-)
-
-var (
-	ErrUserNotFound = errors.New("email is taken")
 )
 
 type UserRepository struct{}
@@ -28,7 +25,7 @@ func (r *UserRepository) GetByID(id int) (*entity.User, error) {
 	var user entity.User
 	result := db.DB.First(&user, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, ErrUserNotFound
+		return nil, domain.ErrUserNotFound
 	}
 	if result.Error != nil {
 		return nil, result.Error
@@ -41,7 +38,7 @@ func (r *UserRepository) GetByEmail(email string) (*entity.User, error) {
 	var user entity.User
 	result := db.DB.Where("email = ?", email).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, ErrUserNotFound
+		return nil, domain.ErrUserNotFound
 	}
 	if result.Error != nil {
 		return nil, result.Error
@@ -61,7 +58,7 @@ func (r *UserRepository) Update(id int, requestUser map[string]interface{}) (*en
 		return nil, result.Error
 	}
 	if result.RowsAffected == 0 {
-		return nil, ErrUserNotFound
+		return nil, domain.ErrUserNotFound
 	}
 
 	return r.GetByID(id)
@@ -73,7 +70,7 @@ func (r *UserRepository) Delete(id int) error {
 		return err.Error
 	}
 	if err.RowsAffected == 0 {
-		return ErrUserNotFound
+		return domain.ErrUserNotFound
 	}
 
 	return nil

@@ -30,8 +30,8 @@ func main() {
 	// Роутеризация запросов
 	router := gin.Default()
 	userRepo := repository.NewUserRepository()
-	userUsecase := usecase.NewUserUsecase(userRepo)
-	authUsecase := usecase.NewAuthUsecase(userUsecase)
+	userUsecase := usecase.NewUserUseCase(userRepo)
+	authUsecase := usecase.NewAuthUseCase(userUsecase)
 	controller.SetupRoutes(router, userUsecase, authUsecase, userRepo)
 
 	port := os.Getenv("SERVER_PORT")

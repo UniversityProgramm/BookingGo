@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
@@ -12,11 +13,11 @@ import (
 )
 
 type BookingController struct {
-	bookingUsecase *usecase.BookingUsecase
+	bookingUseCase *usecase.BookingUseCase
 }
 
-func NewBookingController(bookingUsec *usecase.BookingUsecase) *BookingController {
-	return &BookingController{bookingUsecase: bookingUsec}
+func NewBookingController(bookingUsec *usecase.BookingUseCase) *BookingController {
+	return &BookingController{bookingUseCase: bookingUsec}
 }
 
 func (bc *BookingController) CreateBooking(c *gin.Context) {
@@ -32,13 +33,13 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		return
 	}
 
-	booking, err := bc.bookingUsecase.CreateBooking(currentUser.UserID, &req)
+	booking, err := bc.bookingUseCase.CreateBooking(currentUser.UserID, &req)
 	if err != nil {
-		if errors.Is(err, usecase.ErrOnlyForClient) {
+		if errors.Is(err, domain.ErrOnlyForClient) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка, запись доступна только для клиента"})
-		} else if errors.Is(err, usecase.ErrInvalidTimeRange) {
+		} else if errors.Is(err, domain.ErrInvalidTimeRange) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Недействительное время записи"})
-		} else if errors.Is(err, usecase.ErrSlotNotAvailable) {
+		} else if errors.Is(err, domain.ErrSlotNotAvailable) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Эти дата и время недоступны для записи"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка в записи на услугу"})
@@ -56,7 +57,7 @@ func (bc *BookingController) GetMyBookings(c *gin.Context) {
 		return
 	}
 
-	bookings, err := bc.bookingUsecase.GetMyBookings(currentUser.UserID)
+	bookings, err := bc.bookingUseCase.GetMyBookings(currentUser.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка загрузки записей"})
 		return
@@ -80,9 +81,9 @@ func (bc *BookingController) DeleteBooking(c *gin.Context) {
 		return
 	}
 
-	err = bc.bookingUsecase.DeleteMyBooking(bookingID, currentUser.UserID)
+	err = bc.bookingUseCase.DeleteMyBooking(bookingID, currentUser.UserID)
 	if err != nil {
-		if errors.Is(err, usecase.ErrBookingNotFound) {
+		if errors.Is(err, domain.ErrBookingNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Запись с такими параметрами не найдена или вы не имеете к ней доступа",
 			})

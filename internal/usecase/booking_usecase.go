@@ -1,18 +1,10 @@
 package usecase
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"BookingGo/internal/repository"
-	"errors"
 	"time"
-)
-
-var (
-	ErrOnlyForClient    = errors.New("available only for client")
-	ErrInvalidTimeRange = errors.New("invalid time range")
-	ErrSlotNotAvailable = errors.New("slot not available")
-	ErrBookingNotFound  = errors.New("booking not found")
 )
 
 type BookingRepository interface {
@@ -23,27 +15,27 @@ type BookingRepository interface {
 	DeleteBookingByID(bookingID, userID int) error
 }
 
-type BookingUsecase struct {
+type BookingUseCase struct {
 	bookingRepo BookingRepository
 	userRepo    UserRepository
 }
 
-func NewBookingUsecase(bookingRepo BookingRepository, userRepo UserRepository) *BookingUsecase {
-	return &BookingUsecase{bookingRepo: bookingRepo, userRepo: userRepo}
+func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository) *BookingUseCase {
+	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo}
 }
 
-func (b *BookingUsecase) CreateBooking(id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
+func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
 	user, err := b.userRepo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 	if user.Role != enum.RoleClient {
-		return nil, ErrOnlyForClient
+		return nil, domain.ErrOnlyForClient
 	}
 
 	now := time.Now()
 	if req.SlotStart.Before(now) {
-		return nil, ErrInvalidTimeRange
+		return nil, domain.ErrInvalidTimeRange
 	}
 
 	slotEnd := req.SlotStart.Add(1 * time.Hour)
@@ -53,7 +45,7 @@ func (b *BookingUsecase) CreateBooking(id int, req *entity.CreateBookingRequest)
 		return nil, err
 	}
 	if !available {
-		return nil, ErrSlotNotAvailable
+		return nil, domain.ErrSlotNotAvailable
 	}
 
 	booking := &entity.Booking{
@@ -72,18 +64,10 @@ func (b *BookingUsecase) CreateBooking(id int, req *entity.CreateBookingRequest)
 	return booking, nil
 }
 
-func (b *BookingUsecase) GetMyBookings(id int) ([]entity.Booking, error) {
+func (b *BookingUseCase) GetMyBookings(id int) ([]entity.Booking, error) {
 	return b.bookingRepo.GetBookingsByUserID(id)
 }
 
-func (b *BookingUsecase) DeleteMyBooking(bookingID, userID int) error {
-	err := b.bookingRepo.DeleteBookingByID(bookingID, userID)
-	if err != nil {
-		if errors.Is(err, repository.ErrBookingNotFound) {
-			return ErrBookingNotFound
-		}
-		return err
-	}
-
-	return nil
+func (b *BookingUseCase) DeleteMyBooking(bookingID, userID int) error {
+	return b.bookingRepo.DeleteBookingByID(bookingID, userID)
 }

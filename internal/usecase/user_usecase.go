@@ -1,17 +1,11 @@
 package usecase
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"BookingGo/internal/repository"
-	"errors"
 
 	"golang.org/x/crypto/bcrypt"
-)
-
-var (
-	ErrEmailTaken   = errors.New("user not found")
-	ErrUserNotFound = errors.New("email is taken")
 )
 
 type UserRepository interface {
@@ -24,48 +18,33 @@ type UserRepository interface {
 	EmailExists(email string) (bool, error)
 }
 
-type UserUsecase struct {
+type UserUseCase struct {
 	userRepo UserRepository
 }
 
-func NewUserUsecase(userRepository UserRepository) *UserUsecase {
-	return &UserUsecase{userRepo: userRepository}
+func NewUserUseCase(userRepository UserRepository) *UserUseCase {
+	return &UserUseCase{userRepo: userRepository}
 }
 
-func (u *UserUsecase) GetAllUsers() ([]entity.User, error) {
+func (u *UserUseCase) GetAllUsers() ([]entity.User, error) {
 	return u.userRepo.GetAll()
 }
 
-func (u *UserUsecase) GetUserByID(id int) (*entity.User, error) {
-	user, err := u.userRepo.GetByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-
-	return user, nil
+func (u *UserUseCase) GetUserByID(id int) (*entity.User, error) {
+	return u.userRepo.GetByID(id)
 }
 
-func (u *UserUsecase) GetUserByEmail(email string) (*entity.User, error) {
-	user, err := u.userRepo.GetByEmail(email)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	return user, nil
+func (u *UserUseCase) GetUserByEmail(email string) (*entity.User, error) {
+	return u.userRepo.GetByEmail(email)
 }
 
-func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
+func (u *UserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
 	exists, err := u.userRepo.EmailExists(req.Email)
 	if err != nil {
 		return nil, err
 	}
 	if exists {
-		return nil, ErrEmailTaken
+		return nil, domain.ErrEmailTaken
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -81,7 +60,6 @@ func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 		Role:         enum.RoleClient,
 		IsActive:     true,
 	}
-
 	if err := u.userRepo.Create(user); err != nil {
 		return nil, err
 	}
@@ -89,10 +67,10 @@ func (u *UserUsecase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 	return user, nil
 }
 
-func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+func (u *UserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 	_, err := u.userRepo.GetByID(id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, domain.ErrUserNotFound
 	}
 
 	updates := map[string]interface{}{}
@@ -103,21 +81,9 @@ func (u *UserUsecase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 		updates["phone"] = *req.Phone
 	}
 
-	user, err := u.userRepo.Update(id, updates)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return u.userRepo.Update(id, updates)
 }
 
-func (u *UserUsecase) DeleteUser(id int) error {
-	err := u.userRepo.Delete(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrUserNotFound
-		}
-		return err
-	}
-	return nil
+func (u *UserUseCase) DeleteUser(id int) error {
+	return u.userRepo.Delete(id)
 }

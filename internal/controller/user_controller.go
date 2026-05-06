@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/middleware"
@@ -14,15 +15,15 @@ import (
 )
 
 type UserController struct {
-	userUsecase *usecase.UserUsecase
+	userUseCase *usecase.UserUseCase
 }
 
-func NewUserController(userUsecase *usecase.UserUsecase) *UserController {
-	return &UserController{userUsecase: userUsecase}
+func NewUserController(userUsec *usecase.UserUseCase) *UserController {
+	return &UserController{userUseCase: userUsec}
 }
 
 func (u UserController) GetAllUsers(c *gin.Context) {
-	users, err := u.userUsecase.GetAllUsers()
+	users, err := u.userUseCase.GetAllUsers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось получить пользователей",
@@ -42,9 +43,9 @@ func (u UserController) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	user, err := u.userUsecase.GetUserByID(userId)
+	user, err := u.userUseCase.GetUserByID(userId)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
@@ -60,9 +61,9 @@ func (u UserController) GetUserByID(c *gin.Context) {
 }
 
 func (u UserController) GetUserByEmail(c *gin.Context) {
-	user, err := u.userUsecase.GetUserByEmail(c.Param("email"))
+	user, err := u.userUseCase.GetUserByEmail(c.Param("email"))
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким Email не найден",
 			})
@@ -86,7 +87,7 @@ func (u UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	user, err := u.userUsecase.CreateUser(&createRequest)
+	user, err := u.userUseCase.CreateUser(&createRequest)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Не удалось создать пользователя",
@@ -114,13 +115,13 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := u.userUsecase.UpdateUser(userId, &updateRequest)
+	updatedUser, err := u.userUseCase.UpdateUser(userId, &updateRequest)
 	if err != nil {
-		if errors.Is(err, usecase.ErrEmailTaken) {
+		if errors.Is(err, domain.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Этот Email занят",
 			})
-		} else if errors.Is(err, usecase.ErrUserNotFound) {
+		} else if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})
@@ -153,9 +154,9 @@ func (u UserController) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = u.userUsecase.DeleteUser(userID)
+	err = u.userUseCase.DeleteUser(userID)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Пользователь с таким ID не найден",
 			})

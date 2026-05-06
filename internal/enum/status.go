@@ -1,9 +1,9 @@
 package enum
 
-type status string
+type Status string
 
 const (
-	StatusConfirmed = "confirmed"
-	StatusCancelled = "cancelled"
-	StatusCompleted = "completed"
+	StatusConfirmed Status = "confirmed"
+	StatusCancelled Status = "cancelled"
+	StatusCompleted Status = "completed"
 )

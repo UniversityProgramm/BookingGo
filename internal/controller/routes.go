@@ -9,7 +9,7 @@ import (
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *usecase.AuthUsecase, userRepo *repository.UserRepository) {
+func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUseCase, authUsecase *usecase.AuthUseCase, userRepo *repository.UserRepository) {
 	api := r.Group("/api")
 
 	authController := NewAuthController(authUsecase)
@@ -28,7 +28,7 @@ func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUsecase, authUsecase *u
 	}
 
 	bookingRepo := repository.NewBookingRepository()
-	bookingUsecase := usecase.NewBookingUsecase(bookingRepo, userRepo)
+	bookingUsecase := usecase.NewBookingUseCase(bookingRepo, userRepo)
 	bookingController := NewBookingController(bookingUsecase)
 	bookingGroup := protectedGroup.Group("/bookings")
 	{

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/pkg/db"
 	"errors"
@@ -8,8 +9,6 @@ import (
 
 	"gorm.io/gorm"
 )
-
-var ErrBookingNotFound = errors.New("booking not found")
 
 type BookingRepository struct{}
 
@@ -48,7 +47,7 @@ func (r *BookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 	err := db.DB.First(&booking, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrBookingNotFound
+			return nil, domain.ErrBookingNotFound
 		}
 		return nil, err
 	}
@@ -62,7 +61,7 @@ func (r *BookingRepository) DeleteBookingByID(bookingID, userID int) error {
 		return err.Error
 	}
 	if err.RowsAffected == 0 {
-		return ErrBookingNotFound
+		return domain.ErrBookingNotFound
 	}
 
 	return nil
