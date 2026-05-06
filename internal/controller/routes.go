@@ -2,17 +2,16 @@ package controller
 
 import (
 	"BookingGo/internal/middleware"
-	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUseCase, authUsecase *usecase.AuthUseCase, userRepo *repository.UserRepository) {
+func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *usecase.AuthUseCase, bookingUseCase *usecase.BookingUseCase) {
 	api := r.Group("/api")
 
-	authController := NewAuthController(authUsecase)
+	authController := NewAuthController(authUseCase)
 	authGroup := api.Group("/auth")
 	{
 		authGroup.POST("/login", authController.Login)
@@ -27,9 +26,7 @@ func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUseCase, authUsecase *u
 		protectedGroup.PUT("/password", authController.ChangePassword)
 	}
 
-	bookingRepo := repository.NewBookingRepository()
-	bookingUsecase := usecase.NewBookingUseCase(bookingRepo, userRepo)
-	bookingController := NewBookingController(bookingUsecase)
+	bookingController := NewBookingController(bookingUseCase)
 	bookingGroup := protectedGroup.Group("/bookings")
 	{
 		bookingGroup.GET("", bookingController.GetMyBookings)
@@ -41,7 +38,7 @@ func SetupRoutes(r *gin.Engine, userUsecase *usecase.UserUseCase, authUsecase *u
 	adminGroup.Use(middleware.AuthMiddleware())
 	adminGroup.Use(middleware.AdminOnly())
 	{
-		userController := NewUserController(userUsecase)
+		userController := NewUserController(userUseCase)
 		usersGroup := adminGroup.Group("/users")
 		{
 			usersGroup.GET("", userController.GetAllUsers)
