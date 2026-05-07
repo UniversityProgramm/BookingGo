@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"BookingGo/internal/domain"
 	"BookingGo/internal/enum"
 	"errors"
 	"log"
@@ -8,11 +9,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-)
-
-var (
-	ErrInvalidToken = errors.New("invalid token")
-	ErrExpiredToken = errors.New("token is expired")
 )
 
 var jwtSecret []byte
@@ -58,18 +54,20 @@ func GenerateToken(userID int, email string, role enum.Role) (string, error) {
 func ValidateToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, domain.ErrSigningMethodNotSupported
+		}
 		return jwtSecret, nil
 	})
-
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrExpiredToken
+			return nil, domain.ErrExpiredToken
 		}
-		return nil, ErrInvalidToken
+		return nil, domain.ErrInvalidToken
 	}
 
 	if !token.Valid {
-		return nil, ErrInvalidToken
+		return nil, domain.ErrInvalidToken
 	}
 
 	return claims, nil
