@@ -16,4 +16,5 @@ var (
 	ErrInvalidToken              = errors.New("invalid token")
 	ErrExpiredToken              = errors.New("token is expired")
 	ErrSigningMethodNotSupported = errors.New("signing method not supported")
+	ErrNotImplemented            = errors.New("not implemented")
 )

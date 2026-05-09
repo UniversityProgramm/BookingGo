@@ -8,11 +8,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthUseCase struct {
-	userUseCase *UserUseCase
+type UserUseCaseInterface interface {
+	GetUserByEmail(email string) (*entity.User, error)
+	CreateUser(req *entity.CreateUserRequest) (*entity.User, error)
+	GetUserByID(id int) (*entity.User, error)
+	UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error)
+	ChangePassword(id int, newPassword string) error
 }
 
-func NewAuthUseCase(userUsec *UserUseCase) *AuthUseCase {
+type AuthUseCase struct {
+	userUseCase UserUseCaseInterface
+}
+
+func NewAuthUseCase(userUsec UserUseCaseInterface) *AuthUseCase {
 	return &AuthUseCase{userUseCase: userUsec}
 }
 
@@ -78,10 +86,5 @@ func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) 
 		return err
 	}
 
-	updates := map[string]interface{}{
-		"password_hash": string(newHashPassword),
-	}
-	_, err = a.userUseCase.userRepo.Update(user.ID, updates)
-
-	return err
+	return a.userUseCase.ChangePassword(user.ID, string(newHashPassword))
 }

@@ -85,3 +85,15 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 
 	return count > 0, nil
 }
+
+func (r *UserRepository) ChangePassword(id int, newPassword string) error {
+	result := db.DB.Model(&entity.User{}).Where("id = ?", id).Update("password_hash", newPassword)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrUserNotFound
+	}
+
+	return nil
+}
