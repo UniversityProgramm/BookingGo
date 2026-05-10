@@ -270,8 +270,8 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 
 	authUseCase := NewAuthUseCase(mockUserUseCase)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
-		CurrentPassword: "old",
-		NewPassword:     "old",
+		CurrentPassword: "password123",
+		NewPassword:     "password123",
 	})
 
 	if !errors.Is(err, domain.ErrSamePassword) {

@@ -276,10 +276,10 @@ func TestBookingUseCase_DeleteMyBooking_Success(t *testing.T) {
 }
 
 func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
-	existingStart := time.Date(2026, 5, 10, 14, 0, 0, 0, time.UTC)
-	existingEnd := time.Date(2026, 5, 10, 15, 0, 0, 0, time.UTC)
+	existingStart := time.Now().Add(24 * time.Hour)
+	existingEnd := time.Now().Add(25 * time.Hour)
 
-	newStart := time.Date(2026, 5, 10, 14, 30, 0, 0, time.UTC)
+	newStart := time.Now().Add(24 * time.Hour).Add(30 * time.Minute)
 
 	mockBookingRepo := &MockBookingRepository{
 		IsSlotAvailableFunc: func(start, end time.Time) (bool, error) {

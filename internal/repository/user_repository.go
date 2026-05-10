@@ -3,27 +3,28 @@ package repository
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
-	"BookingGo/pkg/db"
 	"errors"
 
 	"gorm.io/gorm"
 )
 
-type UserRepository struct{}
+type UserRepository struct {
+	db *gorm.DB
+}
 
-func NewUserRepository() *UserRepository {
-	return &UserRepository{}
+func NewUserRepository(DB *gorm.DB) *UserRepository {
+	return &UserRepository{db: DB}
 }
 
 func (r *UserRepository) GetAll() ([]entity.User, error) {
 	var users []entity.User
-	result := db.DB.Find(&users)
+	result := r.db.Find(&users)
 	return users, result.Error
 }
 
 func (r *UserRepository) GetByID(id int) (*entity.User, error) {
 	var user entity.User
-	result := db.DB.First(&user, id)
+	result := r.db.First(&user, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -36,7 +37,7 @@ func (r *UserRepository) GetByID(id int) (*entity.User, error) {
 
 func (r *UserRepository) GetByEmail(email string) (*entity.User, error) {
 	var user entity.User
-	result := db.DB.Where("email = ?", email).First(&user)
+	result := r.db.Where("email = ?", email).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -48,12 +49,12 @@ func (r *UserRepository) GetByEmail(email string) (*entity.User, error) {
 }
 
 func (r *UserRepository) Create(user *entity.User) error {
-	result := db.DB.Create(user)
+	result := r.db.Create(user)
 	return result.Error
 }
 
 func (r *UserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
-	result := db.DB.Model(&entity.User{}).Where("id = ?", id).Updates(requestUser)
+	result := r.db.Model(&entity.User{}).Where("id = ?", id).Updates(requestUser)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -65,7 +66,7 @@ func (r *UserRepository) Update(id int, requestUser map[string]interface{}) (*en
 }
 
 func (r *UserRepository) Delete(id int) error {
-	err := db.DB.Delete(&entity.User{}, id)
+	err := r.db.Delete(&entity.User{}, id)
 	if err.Error != nil {
 		return err.Error
 	}
@@ -78,7 +79,7 @@ func (r *UserRepository) Delete(id int) error {
 
 func (r *UserRepository) EmailExists(email string) (bool, error) {
 	var count int64
-	err := db.DB.Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
+	err := r.db.Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +88,7 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 }
 
 func (r *UserRepository) ChangePassword(id int, newPassword string) error {
-	result := db.DB.Model(&entity.User{}).Where("id = ?", id).Update("password_hash", newPassword)
+	result := r.db.Model(&entity.User{}).Where("id = ?", id).Update("password_hash", newPassword)
 	if result.Error != nil {
 		return result.Error
 	}

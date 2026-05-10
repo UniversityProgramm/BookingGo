@@ -22,8 +22,8 @@ func Run(router *gin.Engine) {
 
 	auth.InitAuth()
 
-	userRepo := repository.NewUserRepository()
-	bookingRepo := repository.NewBookingRepository()
+	userRepo := repository.NewUserRepository(db.DB)
+	bookingRepo := repository.NewBookingRepository(db.DB)
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	authUseCase := usecase.NewAuthUseCase(userUseCase)

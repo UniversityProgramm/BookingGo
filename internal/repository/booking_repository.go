@@ -3,26 +3,27 @@ package repository
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
-	"BookingGo/pkg/db"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
 )
 
-type BookingRepository struct{}
+type BookingRepository struct {
+	db *gorm.DB
+}
 
-func NewBookingRepository() *BookingRepository {
-	return &BookingRepository{}
+func NewBookingRepository(DB *gorm.DB) *BookingRepository {
+	return &BookingRepository{db: DB}
 }
 
 func (r *BookingRepository) Create(booking *entity.Booking) error {
-	return db.DB.Create(booking).Error
+	return r.db.Create(booking).Error
 }
 
 func (r *BookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) {
 	var count int64
-	err := db.DB.Model(&entity.Booking{}).
+	err := r.db.Model(&entity.Booking{}).
 		Where("slot_start < ? AND ? < slot_end", end, start).
 		Count(&count).Error
 	if err != nil {
@@ -34,7 +35,7 @@ func (r *BookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) 
 
 func (r *BookingRepository) GetBookingsByUserID(id int) ([]entity.Booking, error) {
 	var bookings []entity.Booking
-	err := db.DB.Where("user_id = ?", id).Order("slot_start ASC").Find(&bookings).Error
+	err := r.db.Where("user_id = ?", id).Order("slot_start ASC").Find(&bookings).Error
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (r *BookingRepository) GetBookingsByUserID(id int) ([]entity.Booking, error
 
 func (r *BookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 	var booking entity.Booking
-	err := db.DB.First(&booking, id).Error
+	err := r.db.First(&booking, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrBookingNotFound
@@ -56,7 +57,7 @@ func (r *BookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 }
 
 func (r *BookingRepository) DeleteBookingByID(bookingID, userID int) error {
-	err := db.DB.Where("id = ? AND user_id = ?", bookingID, userID).Delete(&entity.Booking{})
+	err := r.db.Where("id = ? AND user_id = ?", bookingID, userID).Delete(&entity.Booking{})
 	if err.Error != nil {
 		return err.Error
 	}
