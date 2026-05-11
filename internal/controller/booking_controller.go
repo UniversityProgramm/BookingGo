@@ -50,6 +50,38 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 	c.JSON(http.StatusCreated, booking)
 }
 
+func (bc *BookingController) ChangeBookingStatus(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	bookingID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID должен быть числом",
+		})
+		return
+	}
+
+	booking, err := bc.bookingUseCase.ChangeBookingStatus(bookingID, currentUser.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrOnlyForStaff) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Ошибка, изменение статуса записи доступно только персоналу"})
+		} else if errors.Is(err, domain.ErrBookingNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Такая запись не найдена"})
+		} else if errors.Is(err, domain.ErrBookingNotFinished) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Время конца записи еще не прошло, нельзя поменять статус записи"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибки при изменении статуса записи"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
+}
+
 func (bc *BookingController) GetMyBookings(c *gin.Context) {
 	currentUser := middleware.GetCurrentUser(c)
 	if currentUser == nil {

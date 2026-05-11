@@ -13,6 +13,7 @@ type BookingRepository interface {
 	GetBookingsByUserID(id int) ([]entity.Booking, error)
 	GetBookingByID(id int) (*entity.Booking, error)
 	DeleteBookingByID(bookingID, userID int) error
+	SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error)
 }
 
 type BookingUseCase struct {
@@ -62,6 +63,27 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 	}
 
 	return booking, nil
+}
+
+func (b *BookingUseCase) ChangeBookingStatus(bookingID int, userID int) (*entity.Booking, error) {
+	user, err := b.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role != enum.RoleStaff {
+		return nil, domain.ErrOnlyForStaff
+	}
+
+	booking, err := b.bookingRepo.GetBookingByID(bookingID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	if booking.SlotEnd.After(now) {
+		return nil, domain.ErrBookingNotFinished
+	}
+
+	return b.bookingRepo.SetBookingStatus(bookingID, enum.StatusCompleted)
 }
 
 func (b *BookingUseCase) GetMyBookings(id int) ([]entity.Booking, error) {

@@ -15,6 +15,7 @@ type MockBookingRepository struct {
 	GetBookingsByUserIDFunc func(id int) ([]entity.Booking, error)
 	GetBookingByIDFunc      func(id int) (*entity.Booking, error)
 	DeleteBookingByIDFunc   func(bookingID, userID int) error
+	SetBookingStatusFunc    func(bookingID int, newStatus enum.Status) (*entity.Booking, error)
 }
 
 func (m *MockBookingRepository) Create(booking *entity.Booking) error {
@@ -52,11 +53,25 @@ func (m *MockBookingRepository) DeleteBookingByID(bookingID, userID int) error {
 	return domain.ErrNotImplemented
 }
 
+func (m *MockBookingRepository) SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error) {
+	if m.SetBookingStatusFunc != nil {
+		return m.SetBookingStatusFunc(bookingID, newStatus)
+	}
+	return nil, domain.ErrNotImplemented
+}
+
 var (
 	testClient = &entity.User{
 		ID:       1,
 		Email:    "client@example.com",
 		Role:     enum.RoleClient,
+		IsActive: true,
+	}
+
+	testStaff = &entity.User{
+		ID:       3,
+		Email:    "staff@mail.ru",
+		Role:     enum.RoleStaff,
 		IsActive: true,
 	}
 
@@ -72,6 +87,15 @@ var (
 		UserID:             1,
 		SlotStart:          time.Now(),
 		SlotEnd:            time.Now().Add(time.Hour),
+		Status:             enum.StatusConfirmed,
+		ProblemDescription: "problem",
+	}
+
+	testBookingPast = &entity.Booking{
+		ID:                 10,
+		UserID:             1,
+		SlotStart:          time.Now().Add(-2 * time.Hour),
+		SlotEnd:            time.Now().Add(-1 * time.Hour),
 		Status:             enum.StatusConfirmed,
 		ProblemDescription: "problem",
 	}
@@ -305,5 +329,89 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrSlotNotAvailable) {
 		t.Errorf("Ожидалась ошибка ErrSlotNotAvailable для пересекающегося слота, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CompleteBooking_NotStaff(t *testing.T) {
+	mockBookingRepo := &MockBookingRepository{}
+	mockUserRepo := &MockUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testClient, nil
+		},
+	}
+
+	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	_, err := useCase.ChangeBookingStatus(100, 2)
+
+	if !errors.Is(err, domain.ErrOnlyForStaff) {
+		t.Errorf("Ожидалась ошибка ErrOnlyForStaff, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
+	mockBookingRepo := &MockBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return nil, domain.ErrBookingNotFound
+		},
+	}
+	mockUserRepo := &MockUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	_, err := useCase.ChangeBookingStatus(100, 3)
+
+	if !errors.Is(err, domain.ErrBookingNotFound) {
+		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
+	mockBookingRepo := &MockBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBooking, nil
+		},
+	}
+	mockUserRepo := &MockUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	_, err := useCase.ChangeBookingStatus(101, 1)
+
+	if !errors.Is(err, domain.ErrBookingNotFinished) {
+		t.Errorf("Ожидалась ошибка ErrBookingNotFinished, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
+	mockBookingRepo := &MockBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBookingPast, nil
+		},
+		SetBookingStatusFunc: func(bookingID int, completeStatus enum.Status) (*entity.Booking, error) {
+			updated := *testBookingPast
+			updated.Status = completeStatus
+			return &updated, nil
+		},
+	}
+	mockUserRepo := &MockUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	result, err := useCase.ChangeBookingStatus(100, 1)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if result.Status != enum.StatusCompleted {
+		t.Errorf("Статус не обновлен: %s", result.Status)
 	}
 }

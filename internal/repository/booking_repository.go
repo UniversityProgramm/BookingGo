@@ -3,6 +3,7 @@ package repository
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
+	"BookingGo/internal/enum"
 	"errors"
 	"time"
 
@@ -54,6 +55,18 @@ func (r *BookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 	}
 
 	return &booking, nil
+}
+
+func (r *BookingRepository) SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error) {
+	result := r.db.Model(&entity.Booking{}).Where("id = ?", bookingID).Update("status", newStatus)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrBookingNotFound
+	}
+
+	return r.GetBookingByID(bookingID)
 }
 
 func (r *BookingRepository) DeleteBookingByID(bookingID, userID int) error {

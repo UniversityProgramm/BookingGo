@@ -32,6 +32,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		bookingGroup.GET("", bookingController.GetMyBookings)
 		bookingGroup.POST("", bookingController.CreateBooking)
 		bookingGroup.DELETE("/:id", bookingController.DeleteBooking)
+		bookingGroup.POST("/completeBooking/:id", bookingController.ChangeBookingStatus)
 	}
 
 	adminGroup := api.Group("")
