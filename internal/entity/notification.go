@@ -15,6 +15,12 @@ type Notification struct {
 	UpdatedAt   time.Time    `json:"updatedAt" gorm:"not null;autoUpdateTime"`
 }
 
+type UserNotificationSettings struct {
+	UserID       int  `json:"user_id" gorm:"primaryKey"`
+	EmailEnabled bool `json:"email_enabled" gorm:"default:false;not null"`
+	SMSEnabled   bool `json:"sms_enabled" gorm:"default:false;not null"`
+}
+
 type NotificationRequestEmail struct {
 }
 
