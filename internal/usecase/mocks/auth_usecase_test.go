@@ -1,9 +1,10 @@
-package usecase
+package mocks
 
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"BookingGo/internal/usecase"
 	"errors"
 	"testing"
 	"time"
@@ -71,7 +72,7 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.Login("notfound@example.com", "password123")
 	if !errors.Is(err, domain.ErrInvalidEmail) {
 		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
@@ -85,7 +86,7 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.Login("test@example.com", "wrong_password")
 	if !errors.Is(err, domain.ErrInvalidPassword) {
 		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
@@ -102,7 +103,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	token, err := authUseCase.Login("test@example.com", "password123")
 
 	if err != nil {
@@ -120,7 +121,7 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 
 	_, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "taken@example.com",
@@ -145,7 +146,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	token, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "newuser@example.com",
 		Password: "qwerty12345",
@@ -168,7 +169,7 @@ func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.GetUserByID(1)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -183,7 +184,7 @@ func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.GetUserByID(1)
 
 	if err != nil {
@@ -198,7 +199,7 @@ func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.UpdateUser(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
 	})
@@ -215,7 +216,7 @@ func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	_, err := authUseCase.UpdateUser(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
 	})
@@ -232,7 +233,7 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "old",
 		NewPassword:     "new",
@@ -250,7 +251,7 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "wrong",
 		NewPassword:     "new",
@@ -268,7 +269,7 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
@@ -289,7 +290,7 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := NewAuthUseCase(mockUserUseCase)
+	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "new",

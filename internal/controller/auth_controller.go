@@ -15,8 +15,8 @@ type AuthController struct {
 	authUseCase *usecase.AuthUseCase
 }
 
-func NewAuthController(authUsec *usecase.AuthUseCase) *AuthController {
-	return &AuthController{authUseCase: authUsec}
+func NewAuthController(authUseCase *usecase.AuthUseCase) *AuthController {
+	return &AuthController{authUseCase: authUseCase}
 }
 
 func (ac *AuthController) Login(c *gin.Context) {

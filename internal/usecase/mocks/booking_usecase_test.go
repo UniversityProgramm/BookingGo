@@ -1,9 +1,10 @@
-package usecase
+package mocks
 
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"BookingGo/internal/usecase"
 	"errors"
 	"testing"
 	"time"
@@ -109,7 +110,7 @@ func TestBookingUseCase_CreateBooking_NotClient(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
 		ProblemDescription: "test",
@@ -130,7 +131,7 @@ func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(-1 * time.Hour),
 		ProblemDescription: "test",
@@ -155,7 +156,7 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 
 	futureTime := time.Now().Add(24 * time.Hour)
 	req := &entity.CreateBookingRequest{
@@ -178,7 +179,7 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
 		ProblemDescription: "test",
@@ -209,7 +210,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          futureTime,
@@ -239,7 +240,7 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	}
 	mockUserRepo := &MockUserRepository{} // не используется в этом методе
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
 	if err != nil {
@@ -256,7 +257,7 @@ func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
 	}
 	mockUserRepo := &MockUserRepository{}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
 	if err == nil {
@@ -275,7 +276,7 @@ func TestBookingUseCase_DeleteMyBooking_BookingNotFound(t *testing.T) {
 	}
 	mockUserRepo := &MockUserRepository{}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	err := useCase.DeleteMyBooking(999, testClient.ID)
 
 	if !errors.Is(err, domain.ErrBookingNotFound) {
@@ -291,7 +292,7 @@ func TestBookingUseCase_DeleteMyBooking_Success(t *testing.T) {
 	}
 	mockUserRepo := &MockUserRepository{}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	err := useCase.DeleteMyBooking(100, testClient.ID)
 
 	if err != nil {
@@ -319,7 +320,7 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          newStart,
 		ProblemDescription: "Тест пересечения",
@@ -340,7 +341,7 @@ func TestBookingUseCase_CompleteBooking_NotStaff(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	_, err := useCase.ChangeBookingStatus(100, 2)
 
 	if !errors.Is(err, domain.ErrOnlyForStaff) {
@@ -360,7 +361,7 @@ func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	_, err := useCase.ChangeBookingStatus(100, 3)
 
 	if !errors.Is(err, domain.ErrBookingNotFound) {
@@ -380,7 +381,7 @@ func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	_, err := useCase.ChangeBookingStatus(101, 1)
 
 	if !errors.Is(err, domain.ErrBookingNotFinished) {
@@ -405,7 +406,7 @@ func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
 		},
 	}
 
-	useCase := NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
 	result, err := useCase.ChangeBookingStatus(100, 1)
 
 	if err != nil {

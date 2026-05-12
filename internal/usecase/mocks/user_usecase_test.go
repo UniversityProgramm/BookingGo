@@ -1,9 +1,10 @@
-package usecase
+package mocks
 
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"BookingGo/internal/usecase"
 	"errors"
 	"testing"
 	"time"
@@ -97,7 +98,7 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 			return []entity.User{*testUser}, nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.GetAllUsers()
 	if err != nil {
@@ -111,7 +112,7 @@ func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.GetUserByID(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -125,7 +126,7 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 			return testUser, nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.GetUserByID(1)
 	if err != nil {
@@ -139,7 +140,7 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.GetUserByEmail("email")
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -153,7 +154,7 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 			return testUser, nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.GetUserByEmail("email@mail.ru")
 	if err != nil {
@@ -167,7 +168,7 @@ func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 			return true, nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.CreateUser(&entity.CreateUserRequest{
 		Email:    "takenemail@mail.ru",
@@ -193,7 +194,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 			return nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	_, err := useCase.CreateUser(&entity.CreateUserRequest{
 		Email:    "new@mail.ru",
@@ -213,7 +214,7 @@ func TestUserUseCase_UpdateUser_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 	req := &entity.UpdateUserRequest{
 		FIO:   new("new test fio"),
 		Phone: new("123123123"),
@@ -252,7 +253,7 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 		},
 	}
 
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 	req := &entity.UpdateUserRequest{
 		FIO:   &updatedFIO,
 		Phone: &updatedPhone,
@@ -270,7 +271,7 @@ func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 			return domain.ErrUserNotFound
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	err := useCase.DeleteUser(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -284,7 +285,7 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 			return nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 
 	err := useCase.DeleteUser(1)
 	if err != nil {
@@ -298,7 +299,7 @@ func TestUserUseCase_ChangePassword_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
@@ -316,7 +317,7 @@ func TestUserUseCase_ChangePassword_Success(t *testing.T) {
 			return testUser, nil
 		},
 	}
-	useCase := NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(mockRepo)
 	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)

@@ -6,12 +6,12 @@ import (
 )
 
 type User struct {
-	ID           int       `gorm:"primaryKey;autoIncrement" json:"id"`
-	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
-	PasswordHash string    `gorm:"not null" json:"-"`
-	FIO          string    `json:"fio"`
-	Phone        string    `gorm:"not null" json:"phone"`
-	Role         enum.Role `gorm:"not null" json:"role"`
+	ID           int       `json:"id" gorm:"primaryKey;autoIncrement" `
+	Email        string    `json:"email" gorm:"uniqueIndex;not null" `
+	PasswordHash string    `json:"-" gorm:"not null"`
+	FIO          string    `json:"fio" `
+	Phone        string    `json:"phone" gorm:"not null"`
+	Role         enum.Role `json:"role" gorm:"not null"`
 	CreatedAt    time.Time `json:"created_at" gorm:"not null;autoCreateTime"`
 	UpdatedAt    time.Time `json:"updated_at" gorm:"not null;autoUpdateTime"`
 	IsActive     bool      `json:"is_active"`

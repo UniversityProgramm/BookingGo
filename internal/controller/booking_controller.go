@@ -16,8 +16,8 @@ type BookingController struct {
 	bookingUseCase *usecase.BookingUseCase
 }
 
-func NewBookingController(bookingUsec *usecase.BookingUseCase) *BookingController {
-	return &BookingController{bookingUseCase: bookingUsec}
+func NewBookingController(bookingUseCase *usecase.BookingUseCase) *BookingController {
+	return &BookingController{bookingUseCase: bookingUseCase}
 }
 
 func (bc *BookingController) CreateBooking(c *gin.Context) {

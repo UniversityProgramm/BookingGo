@@ -8,7 +8,7 @@ import (
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *usecase.AuthUseCase, bookingUseCase *usecase.BookingUseCase) {
+func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *usecase.AuthUseCase, bookingUseCase *usecase.BookingUseCase, notificationUseCase *usecase.NotificationUseCase) {
 	api := r.Group("/api")
 
 	authController := NewAuthController(authUseCase)
@@ -33,6 +33,13 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		bookingGroup.POST("", bookingController.CreateBooking)
 		bookingGroup.DELETE("/:id", bookingController.DeleteBooking)
 		bookingGroup.POST("/completeBooking/:id", bookingController.ChangeBookingStatus)
+	}
+
+	notificationController := NewNotificationController(notificationUseCase)
+	notificationGroup := protectedGroup.Group("/notifications")
+	{
+		notificationGroup.GET("", notificationController.)
+		notificationGroup.PATCH("/settings", notificationController.)
 	}
 
 	adminGroup := api.Group("")

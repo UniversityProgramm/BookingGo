@@ -18,8 +18,8 @@ type UserController struct {
 	userUseCase *usecase.UserUseCase
 }
 
-func NewUserController(userUsec *usecase.UserUseCase) *UserController {
-	return &UserController{userUseCase: userUsec}
+func NewUserController(userUseCase *usecase.UserUseCase) *UserController {
+	return &UserController{userUseCase: userUseCase}
 }
 
 func (u UserController) GetAllUsers(c *gin.Context) {

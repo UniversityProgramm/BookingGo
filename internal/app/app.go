@@ -24,10 +24,11 @@ func Run(router *gin.Engine) {
 
 	userRepo := repository.NewUserRepository(db.DB)
 	bookingRepo := repository.NewBookingRepository(db.DB)
+	notificationRepo := repository.NewNotificationRepository(db.DB)
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	authUseCase := usecase.NewAuthUseCase(userUseCase)
 	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo)
-
-	controller.SetupRoutes(router, userUseCase, authUseCase, bookingUseCase)
+	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
+	controller.SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
 }
