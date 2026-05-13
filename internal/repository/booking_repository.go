@@ -34,7 +34,7 @@ func (r *BookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) 
 	return count == 0, nil
 }
 
-func (r *BookingRepository) GetBookingsByUserID(id int) ([]entity.Booking, error) {
+func (r *BookingRepository) GetAllBookingsByUserID(id int) ([]entity.Booking, error) {
 	var bookings []entity.Booking
 	err := r.db.Where("user_id = ?", id).Order("slot_start ASC").Find(&bookings).Error
 	if err != nil {
@@ -57,8 +57,8 @@ func (r *BookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 	return &booking, nil
 }
 
-func (r *BookingRepository) SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error) {
-	result := r.db.Model(&entity.Booking{}).Where("id = ?", bookingID).Update("status", newStatus)
+func (r *BookingRepository) SetBookingComplete(bookingID int) (*entity.Booking, error) {
+	result := r.db.Model(&entity.Booking{}).Where("id = ?", bookingID).Update("status", enum.StatusCompleted)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -69,14 +69,14 @@ func (r *BookingRepository) SetBookingStatus(bookingID int, newStatus enum.Statu
 	return r.GetBookingByID(bookingID)
 }
 
-func (r *BookingRepository) DeleteBookingByID(bookingID, userID int) error {
-	err := r.db.Where("id = ? AND user_id = ?", bookingID, userID).Delete(&entity.Booking{})
-	if err.Error != nil {
-		return err.Error
+func (r *BookingRepository) SetBookingCancel(bookingID, userID int) (*entity.Booking, error) {
+	result := r.db.Model(&entity.Booking{}).Where("id = ? AND user_id = ?", bookingID, userID).Update("status", enum.StatusCancelled)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-	if err.RowsAffected == 0 {
-		return domain.ErrBookingNotFound
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrBookingNotFound
 	}
 
-	return nil
+	return r.GetBookingByID(bookingID)
 }

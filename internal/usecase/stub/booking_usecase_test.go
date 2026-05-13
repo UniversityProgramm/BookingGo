@@ -1,4 +1,4 @@
-package mocks
+package stub
 
 import (
 	"BookingGo/internal/domain"
@@ -10,53 +10,64 @@ import (
 	"time"
 )
 
-type MockBookingRepository struct {
-	CreateFunc              func(booking *entity.Booking) error
-	IsSlotAvailableFunc     func(start, end time.Time) (bool, error)
-	GetBookingsByUserIDFunc func(id int) ([]entity.Booking, error)
-	GetBookingByIDFunc      func(id int) (*entity.Booking, error)
-	DeleteBookingByIDFunc   func(bookingID, userID int) error
-	SetBookingStatusFunc    func(bookingID int, newStatus enum.Status) (*entity.Booking, error)
+type StubBookingRepository struct {
+	CreateFunc                 func(booking *entity.Booking) error
+	IsSlotAvailableFunc        func(start, end time.Time) (bool, error)
+	GetAllBookingsByUserIDFunc func(id int) ([]entity.Booking, error)
+	GetBookingByIDFunc         func(id int) (*entity.Booking, error)
+	SetBookingCompleteFunc     func(bookingID int) (*entity.Booking, error)
+	SetBookingCancelFunc       func(bookingID, userID int) (*entity.Booking, error)
 }
 
-func (m *MockBookingRepository) Create(booking *entity.Booking) error {
+type StubBookingNotifier struct {
+	CreateNotificationFunc func(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
+}
+
+func (m *StubBookingNotifier) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
+	if m.CreateNotificationFunc != nil {
+		return m.CreateNotificationFunc(userID, notificationType, params)
+	}
+	return nil
+}
+
+func (m *StubBookingRepository) Create(booking *entity.Booking) error {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(booking)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *MockBookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) {
+func (m *StubBookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) {
 	if m.IsSlotAvailableFunc != nil {
 		return m.IsSlotAvailableFunc(start, end)
 	}
 	return false, domain.ErrNotImplemented
 }
 
-func (m *MockBookingRepository) GetBookingsByUserID(id int) ([]entity.Booking, error) {
-	if m.GetBookingsByUserIDFunc != nil {
-		return m.GetBookingsByUserIDFunc(id)
+func (m *StubBookingRepository) GetAllBookingsByUserID(id int) ([]entity.Booking, error) {
+	if m.GetAllBookingsByUserIDFunc != nil {
+		return m.GetAllBookingsByUserIDFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockBookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
+func (m *StubBookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
 	if m.GetBookingByIDFunc != nil {
 		return m.GetBookingByIDFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockBookingRepository) DeleteBookingByID(bookingID, userID int) error {
-	if m.DeleteBookingByIDFunc != nil {
-		return m.DeleteBookingByIDFunc(bookingID, userID)
+func (m *StubBookingRepository) SetBookingComplete(bookingID int) (*entity.Booking, error) {
+	if m.SetBookingCompleteFunc != nil {
+		return m.SetBookingCompleteFunc(bookingID)
 	}
-	return domain.ErrNotImplemented
+	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockBookingRepository) SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error) {
-	if m.SetBookingStatusFunc != nil {
-		return m.SetBookingStatusFunc(bookingID, newStatus)
+func (m *StubBookingRepository) SetBookingCancel(bookingID, userID int) (*entity.Booking, error) {
+	if m.SetBookingCancelFunc != nil {
+		return m.SetBookingCancelFunc(bookingID, userID)
 	}
 	return nil, domain.ErrNotImplemented
 }
@@ -67,6 +78,10 @@ var (
 		Email:    "client@example.com",
 		Role:     enum.RoleClient,
 		IsActive: true,
+		UserNotificationSettings: entity.NotificationSettings{
+			IsEmailSend: true,
+			IsPhoneSend: false,
+		},
 	}
 
 	testStaff = &entity.User{
@@ -74,6 +89,10 @@ var (
 		Email:    "staff@mail.ru",
 		Role:     enum.RoleStaff,
 		IsActive: true,
+		UserNotificationSettings: entity.NotificationSettings{
+			IsEmailSend: true,
+			IsPhoneSend: false,
+		},
 	}
 
 	testAdmin = &entity.User{
@@ -81,19 +100,23 @@ var (
 		Email:    "admin@example.com",
 		Role:     enum.RoleAdmin,
 		IsActive: true,
+		UserNotificationSettings: entity.NotificationSettings{
+			IsEmailSend: true,
+			IsPhoneSend: false,
+		},
 	}
 
 	testBooking = &entity.Booking{
 		ID:                 10,
 		UserID:             1,
-		SlotStart:          time.Now(),
-		SlotEnd:            time.Now().Add(time.Hour),
+		SlotStart:          time.Now().Add(time.Hour),
+		SlotEnd:            time.Now().Add(2 * time.Hour),
 		Status:             enum.StatusConfirmed,
 		ProblemDescription: "problem",
 	}
 
 	testBookingPast = &entity.Booking{
-		ID:                 10,
+		ID:                 11,
 		UserID:             1,
 		SlotStart:          time.Now().Add(-2 * time.Hour),
 		SlotEnd:            time.Now().Add(-1 * time.Hour),
@@ -102,36 +125,16 @@ var (
 	}
 )
 
-func TestBookingUseCase_CreateBooking_NotClient(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{}
-	mockUserRepo := &MockUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testAdmin, nil
-		},
-	}
-
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	req := &entity.CreateBookingRequest{
-		SlotStart:          time.Now().Add(24 * time.Hour),
-		ProblemDescription: "test",
-	}
-
-	_, err := useCase.CreateBooking(testAdmin.ID, req)
-
-	if !errors.Is(err, domain.ErrOnlyForClient) {
-		t.Errorf("Ожидалась ошибка ErrOnlyForClient, получена: %v", err)
-	}
-}
-
 func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{}
-	mockUserRepo := &MockUserRepository{
+	stubBookingRepo := &StubBookingRepository{}
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testClient, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(-1 * time.Hour),
 		ProblemDescription: "test",
@@ -145,18 +148,19 @@ func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
 }
 
 func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		IsSlotAvailableFunc: func(start, end time.Time) (bool, error) {
 			return false, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testClient, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	futureTime := time.Now().Add(24 * time.Hour)
 	req := &entity.CreateBookingRequest{
@@ -172,14 +176,15 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 }
 
 func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{}
-	mockUserRepo := &MockUserRepository{
+	stubBookingRepo := &StubBookingRepository{}
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
 		ProblemDescription: "test",
@@ -195,7 +200,7 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 	futureTime := time.Now().Add(24 * time.Hour) // завтра
 
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		IsSlotAvailableFunc: func(start, end time.Time) (bool, error) {
 			return true, nil
 		},
@@ -204,13 +209,14 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		},
 	}
 
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testClient, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          futureTime,
@@ -230,17 +236,18 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	expectedBookings := []entity.Booking{*testBooking}
 
-	mockBookingRepo := &MockBookingRepository{
-		GetBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
 			if id != testClient.ID {
 				t.Errorf("Неверный UserID: %d", id)
 			}
 			return expectedBookings, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{} // не используется в этом методе
+	stubUserRepo := &StubUserRepository{} // не используется в этом методе
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
 	if err != nil {
@@ -250,14 +257,15 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 
 func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
 	dbError := errors.New("database error")
-	mockBookingRepo := &MockBookingRepository{
-		GetBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
 			return nil, dbError
 		},
 	}
-	mockUserRepo := &MockUserRepository{}
+	stubUserRepo := &StubUserRepository{}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
 	if err == nil {
@@ -268,32 +276,55 @@ func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
 	}
 }
 
-func TestBookingUseCase_DeleteMyBooking_BookingNotFound(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
-		DeleteBookingByIDFunc: func(bookingID, userID int) error {
-			return domain.ErrBookingNotFound
+func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return nil, domain.ErrBookingNotFound
 		},
 	}
-	mockUserRepo := &MockUserRepository{}
+	stubUserRepo := &StubUserRepository{}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	err := useCase.DeleteMyBooking(999, testClient.ID)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	err := useCase.CancelMyBooking(999, testClient.ID)
 
 	if !errors.Is(err, domain.ErrBookingNotFound) {
 		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
 	}
 }
 
-func TestBookingUseCase_DeleteMyBooking_Success(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
-		DeleteBookingByIDFunc: func(bookingID, userID int) error {
-			return nil
+func TestBookingUseCase_CancelMyBooking_BookingAlreadyActive(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBookingPast, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{}
+	stubUserRepo := &StubUserRepository{}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	err := useCase.DeleteMyBooking(100, testClient.ID)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	err := useCase.CancelMyBooking(10, testClient.ID)
+
+	if !errors.Is(err, domain.ErrBookingAlreadyActive) {
+		t.Errorf("Ожидалась ошибка ErrBookingAlreadyActive, получена: %v", err)
+	}
+
+}
+
+func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBooking, nil
+		},
+		SetBookingCancelFunc: func(bookingID, userID int) (*entity.Booking, error) {
+			return &entity.Booking{}, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	err := useCase.CancelMyBooking(10, testClient.ID)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -306,7 +337,7 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 
 	newStart := time.Now().Add(24 * time.Hour).Add(30 * time.Minute)
 
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		IsSlotAvailableFunc: func(start, end time.Time) (bool, error) {
 			if existingStart.Before(end) && start.Before(existingEnd) {
 				return false, nil
@@ -314,13 +345,14 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 			return true, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testClient, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          newStart,
 		ProblemDescription: "Тест пересечения",
@@ -334,15 +366,16 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 }
 
 func TestBookingUseCase_CompleteBooking_NotStaff(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{}
-	mockUserRepo := &MockUserRepository{
+	stubBookingRepo := &StubBookingRepository{}
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testClient, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	_, err := useCase.ChangeBookingStatus(100, 2)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	_, err := useCase.CompleteBookingByID(100, 2)
 
 	if !errors.Is(err, domain.ErrOnlyForStaff) {
 		t.Errorf("Ожидалась ошибка ErrOnlyForStaff, получена: %v", err)
@@ -350,19 +383,20 @@ func TestBookingUseCase_CompleteBooking_NotStaff(t *testing.T) {
 }
 
 func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
 			return nil, domain.ErrBookingNotFound
 		},
 	}
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testStaff, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	_, err := useCase.ChangeBookingStatus(100, 3)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	_, err := useCase.CompleteBookingByID(100, 3)
 
 	if !errors.Is(err, domain.ErrBookingNotFound) {
 		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
@@ -370,19 +404,20 @@ func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
 }
 
 func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
 			return testBooking, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testStaff, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	_, err := useCase.ChangeBookingStatus(101, 1)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	_, err := useCase.CompleteBookingByID(101, 1)
 
 	if !errors.Is(err, domain.ErrBookingNotFinished) {
 		t.Errorf("Ожидалась ошибка ErrBookingNotFinished, получена: %v", err)
@@ -390,24 +425,25 @@ func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
 }
 
 func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
-	mockBookingRepo := &MockBookingRepository{
+	stubBookingRepo := &StubBookingRepository{
 		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
 			return testBookingPast, nil
 		},
-		SetBookingStatusFunc: func(bookingID int, completeStatus enum.Status) (*entity.Booking, error) {
+		SetBookingCompleteFunc: func(bookingID int) (*entity.Booking, error) {
 			updated := *testBookingPast
-			updated.Status = completeStatus
+			updated.Status = enum.StatusCompleted
 			return &updated, nil
 		},
 	}
-	mockUserRepo := &MockUserRepository{
+	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testStaff, nil
 		},
 	}
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo)
-	result, err := useCase.ChangeBookingStatus(100, 1)
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	result, err := useCase.CompleteBookingByID(100, 1)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)

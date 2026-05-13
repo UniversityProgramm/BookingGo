@@ -1,4 +1,4 @@
-package mocks
+package stub
 
 import (
 	"BookingGo/internal/domain"
@@ -10,43 +10,54 @@ import (
 	"time"
 )
 
-type MockUserUseCase struct {
+type StubUserUseCase struct {
 	GetUserByEmailFunc func(email string) (*entity.User, error)
 	CreateUserFunc     func(req *entity.CreateUserRequest) (*entity.User, error)
-	GetUserByIDFunc    func(id int) (*entity.User, error)
-	UpdateUserFunc     func(id int, req *entity.UpdateUserRequest) (*entity.User, error)
+	GetMeFunc          func(id int) (*entity.User, error)
+	UpdateMeFunc       func(id int, req *entity.UpdateUserRequest) (*entity.User, error)
 	ChangePasswordFunc func(id int, newPassword string) error
 }
 
-func (m *MockUserUseCase) GetUserByEmail(email string) (*entity.User, error) {
+type StubAuthNotifier struct {
+	CreateNotificationFunc func(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
+}
+
+func (m *StubAuthNotifier) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
+	if m.CreateNotificationFunc != nil {
+		return m.CreateNotificationFunc(userID, notificationType, params)
+	}
+	return nil
+}
+
+func (m *StubUserUseCase) GetUserByEmail(email string) (*entity.User, error) {
 	if m.GetUserByEmailFunc != nil {
 		return m.GetUserByEmailFunc(email)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
+func (m *StubUserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
 	if m.CreateUserFunc != nil {
 		return m.CreateUserFunc(req)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserUseCase) GetUserByID(id int) (*entity.User, error) {
-	if m.GetUserByIDFunc != nil {
-		return m.GetUserByIDFunc(id)
+func (m *StubUserUseCase) GetUserByID(id int) (*entity.User, error) {
+	if m.GetMeFunc != nil {
+		return m.GetMeFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
-	if m.UpdateUserFunc != nil {
-		return m.UpdateUserFunc(id, req)
+func (m *StubUserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+	if m.UpdateMeFunc != nil {
+		return m.UpdateMeFunc(id, req)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserUseCase) ChangePassword(id int, newPassword string) error {
+func (m *StubUserUseCase) ChangePassword(id int, newPassword string) error {
 	if m.ChangePasswordFunc != nil {
 		return m.ChangePasswordFunc(id, newPassword)
 	}
@@ -63,16 +74,21 @@ var testAuthUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
+	UserNotificationSettings: entity.NotificationSettings{
+		IsEmailSend: true,
+		IsPhoneSend: false,
+	},
 }
 
 func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
+	stubUserUseCase := &StubUserUseCase{
 		GetUserByEmailFunc: func(email string) (*entity.User, error) {
 			return nil, domain.ErrInvalidEmail
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Login("notfound@example.com", "password123")
 	if !errors.Is(err, domain.ErrInvalidEmail) {
 		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
@@ -80,13 +96,14 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 }
 
 func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
+	stubUserUseCase := &StubUserUseCase{
 		GetUserByEmailFunc: func(email string) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Login("test@example.com", "wrong_password")
 	if !errors.Is(err, domain.ErrInvalidPassword) {
 		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
@@ -94,7 +111,7 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 }
 
 func TestAuthUseCase_Login_Success(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
+	stubUserUseCase := &StubUserUseCase{
 		GetUserByEmailFunc: func(email string) (*entity.User, error) {
 			if email == "test@example.com" {
 				return testAuthUser, nil
@@ -103,7 +120,8 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	token, err := authUseCase.Login("test@example.com", "password123")
 
 	if err != nil {
@@ -115,14 +133,14 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
+	stubUserUseCase := &StubUserUseCase{
 		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
 			return nil, domain.ErrEmailTaken
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
-
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "taken@example.com",
 		Password: "qwerty123",
@@ -135,18 +153,23 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 }
 
 func TestAuthUseCase_Register_Success(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
+	stubUserUseCase := &StubUserUseCase{
 		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
 			return &entity.User{
 				ID:    2,
 				Email: req.Email,
 				FIO:   req.FIO,
 				Role:  enum.RoleClient,
+				UserNotificationSettings: entity.NotificationSettings{
+					IsEmailSend: true,
+					IsPhoneSend: false,
+				},
 			}, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	token, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "newuser@example.com",
 		Password: "qwerty12345",
@@ -163,14 +186,15 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
-	_, err := authUseCase.GetUserByID(1)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	_, err := authUseCase.GetMe(1)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
@@ -178,14 +202,15 @@ func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
-	_, err := authUseCase.GetUserByID(1)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	_, err := authUseCase.GetMe(1)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -193,14 +218,15 @@ func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		UpdateUserFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		UpdateMeFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
-	_, err := authUseCase.UpdateUser(1, &entity.UpdateUserRequest{
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
 	})
 
@@ -210,14 +236,15 @@ func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		UpdateUserFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		UpdateMeFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
-	_, err := authUseCase.UpdateUser(1, &entity.UpdateUserRequest{
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
 	})
 
@@ -227,13 +254,14 @@ func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "old",
 		NewPassword:     "new",
@@ -245,13 +273,14 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "wrong",
 		NewPassword:     "new",
@@ -263,13 +292,14 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
@@ -281,8 +311,8 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
-	mockUserUseCase := &MockUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 		ChangePasswordFunc: func(id int, newPassword string) error {
@@ -290,7 +320,8 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(mockUserUseCase)
+	stubNotifier := &StubAuthNotifier{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "new",

@@ -71,7 +71,7 @@ func (ac *AuthController) GetMe(c *gin.Context) {
 		return
 	}
 
-	user, err := ac.authUseCase.GetUserByID(currentUser.UserID)
+	user, err := ac.authUseCase.GetMe(currentUser.UserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
@@ -96,7 +96,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := ac.authUseCase.UpdateUser(userID, &req)
+	updatedUser, err := ac.authUseCase.UpdateMe(userID, &req)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})

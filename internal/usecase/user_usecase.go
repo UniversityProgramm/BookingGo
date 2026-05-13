@@ -60,6 +60,10 @@ func (u *UserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 		Phone:        req.Phone,
 		Role:         enum.RoleClient,
 		IsActive:     true,
+		UserNotificationSettings: entity.NotificationSettings{
+			IsEmailSend: true,
+			IsPhoneSend: false,
+		},
 	}
 	if err := u.userRepo.Create(user); err != nil {
 		return nil, err

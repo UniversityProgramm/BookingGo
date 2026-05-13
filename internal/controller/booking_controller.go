@@ -35,9 +35,7 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 
 	booking, err := bc.bookingUseCase.CreateBooking(currentUser.UserID, &req)
 	if err != nil {
-		if errors.Is(err, domain.ErrOnlyForClient) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка, запись доступна только для клиента"})
-		} else if errors.Is(err, domain.ErrInvalidTimeRange) {
+		if errors.Is(err, domain.ErrInvalidTimeRange) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Недействительное время записи"})
 		} else if errors.Is(err, domain.ErrSlotNotAvailable) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Эти дата и время недоступны для записи"})
@@ -50,7 +48,7 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 	c.JSON(http.StatusCreated, booking)
 }
 
-func (bc *BookingController) ChangeBookingStatus(c *gin.Context) {
+func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 	currentUser := middleware.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
@@ -65,7 +63,7 @@ func (bc *BookingController) ChangeBookingStatus(c *gin.Context) {
 		return
 	}
 
-	booking, err := bc.bookingUseCase.ChangeBookingStatus(bookingID, currentUser.UserID)
+	booking, err := bc.bookingUseCase.CompleteBookingByID(bookingID, currentUser.UserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrOnlyForStaff) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Ошибка, изменение статуса записи доступно только персоналу"})
@@ -98,7 +96,7 @@ func (bc *BookingController) GetMyBookings(c *gin.Context) {
 	c.JSON(http.StatusOK, bookings)
 }
 
-func (bc *BookingController) DeleteBooking(c *gin.Context) {
+func (bc *BookingController) CancelMyBooking(c *gin.Context) {
 	currentUser := middleware.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
@@ -113,14 +111,18 @@ func (bc *BookingController) DeleteBooking(c *gin.Context) {
 		return
 	}
 
-	err = bc.bookingUseCase.DeleteMyBooking(bookingID, currentUser.UserID)
+	err = bc.bookingUseCase.CancelMyBooking(bookingID, currentUser.UserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrBookingNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Запись с такими параметрами не найдена или вы не имеете к ней доступа",
 			})
+		} else if errors.Is(err, domain.ErrBookingAlreadyActive) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Время записи уже активно, запись нельзя отменить",
+			})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка удаления записи"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка отмены записи"})
 		}
 		return
 	}

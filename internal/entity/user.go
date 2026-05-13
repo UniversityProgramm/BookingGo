@@ -6,15 +6,16 @@ import (
 )
 
 type User struct {
-	ID           int       `json:"id" gorm:"primaryKey;autoIncrement" `
-	Email        string    `json:"email" gorm:"uniqueIndex;not null" `
-	PasswordHash string    `json:"-" gorm:"not null"`
-	FIO          string    `json:"fio" `
-	Phone        string    `json:"phone" gorm:"not null"`
-	Role         enum.Role `json:"role" gorm:"not null"`
-	CreatedAt    time.Time `json:"created_at" gorm:"not null;autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" gorm:"not null;autoUpdateTime"`
-	IsActive     bool      `json:"is_active"`
+	ID                       int                  `json:"id" gorm:"primaryKey;autoIncrement" `
+	Email                    string               `json:"email" gorm:"uniqueIndex;not null" `
+	PasswordHash             string               `json:"-" gorm:"not null"`
+	FIO                      string               `json:"fio" `
+	Phone                    string               `json:"phone" gorm:"not null"`
+	Role                     enum.Role            `json:"role" gorm:"not null"`
+	CreatedAt                time.Time            `json:"created_at" gorm:"not null;autoCreateTime"`
+	UpdatedAt                time.Time            `json:"updated_at" gorm:"not null;autoUpdateTime"`
+	IsActive                 bool                 `json:"is_active"`
+	UserNotificationSettings NotificationSettings `json:"user_notification_settings" gorm:"type:json;serializer:json;not null"`
 }
 
 type CreateUserRequest struct {

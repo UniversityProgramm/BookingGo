@@ -52,6 +52,17 @@ func GetCurrentUser(c *gin.Context) *auth.Claims {
 	return nil
 }
 
+func StaffOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := GetCurrentUser(c)
+		if user == nil || user.Role != enum.RoleStaff {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Доступно только для Staff"})
+			return
+		}
+		c.Next()
+	}
+}
+
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user := GetCurrentUser(c)

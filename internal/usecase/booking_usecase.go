@@ -4,34 +4,44 @@ import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"log"
 	"time"
 )
 
 type BookingRepository interface {
 	Create(booking *entity.Booking) error
 	IsSlotAvailable(start, end time.Time) (bool, error)
-	GetBookingsByUserID(id int) ([]entity.Booking, error)
+	GetAllBookingsByUserID(id int) ([]entity.Booking, error)
 	GetBookingByID(id int) (*entity.Booking, error)
-	DeleteBookingByID(bookingID, userID int) error
-	SetBookingStatus(bookingID int, newStatus enum.Status) (*entity.Booking, error)
+	SetBookingComplete(bookingID int) (*entity.Booking, error)
+	SetBookingCancel(bookingID, userID int) (*entity.Booking, error)
+}
+
+type BookingNotifier interface {
+	CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
 }
 
 type BookingUseCase struct {
 	bookingRepo BookingRepository
 	userRepo    UserRepository
+	notifier    BookingNotifier
 }
 
-func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository) *BookingUseCase {
-	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo}
+func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, notifier BookingNotifier) *BookingUseCase {
+	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo, notifier: notifier}
+}
+
+func (b *BookingUseCase) SendBookingNotification(userID int, bookingType enum.TypeOfNotification, params entity.NotificationParams) {
+	err := b.notifier.CreateNotification(userID, bookingType, params)
+	if err != nil {
+		log.Printf("[Notifications] Ошибка при создании уведомления: %v", err.Error())
+	}
 }
 
 func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
 	user, err := b.userRepo.GetByID(id)
 	if err != nil {
 		return nil, err
-	}
-	if user.Role != enum.RoleClient {
-		return nil, domain.ErrOnlyForClient
 	}
 
 	now := time.Now()
@@ -62,10 +72,15 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 		return nil, err
 	}
 
+	params := entity.NotificationParams{
+		BookingID: booking.ID,
+	}
+	b.SendBookingNotification(user.ID, enum.NewBookingType, params)
+
 	return booking, nil
 }
 
-func (b *BookingUseCase) ChangeBookingStatus(bookingID int, userID int) (*entity.Booking, error) {
+func (b *BookingUseCase) CompleteBookingByID(bookingID int, userID int) (*entity.Booking, error) {
 	user, err := b.userRepo.GetByID(userID)
 	if err != nil {
 		return nil, err
@@ -83,13 +98,34 @@ func (b *BookingUseCase) ChangeBookingStatus(bookingID int, userID int) (*entity
 		return nil, domain.ErrBookingNotFinished
 	}
 
-	return b.bookingRepo.SetBookingStatus(bookingID, enum.StatusCompleted)
+	params := entity.NotificationParams{
+		BookingID: booking.ID,
+	}
+	b.SendBookingNotification(booking.UserID, enum.CompleteBookingType, params)
+
+	return b.bookingRepo.SetBookingComplete(bookingID)
 }
 
 func (b *BookingUseCase) GetMyBookings(id int) ([]entity.Booking, error) {
-	return b.bookingRepo.GetBookingsByUserID(id)
+	return b.bookingRepo.GetAllBookingsByUserID(id)
 }
 
-func (b *BookingUseCase) DeleteMyBooking(bookingID, userID int) error {
-	return b.bookingRepo.DeleteBookingByID(bookingID, userID)
+func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
+	booking, err := b.bookingRepo.GetBookingByID(bookingID)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	if booking.SlotStart.Before(now) {
+		return domain.ErrBookingAlreadyActive
+	}
+
+	_, err = b.bookingRepo.SetBookingCancel(bookingID, userID)
+
+	params := entity.NotificationParams{
+		BookingID: booking.ID,
+	}
+	b.SendBookingNotification(userID, enum.CancelBookingType, params)
+
+	return err
 }

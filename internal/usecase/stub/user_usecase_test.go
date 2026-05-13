@@ -1,4 +1,4 @@
-package mocks
+package stub
 
 import (
 	"BookingGo/internal/domain"
@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type MockUserRepository struct {
+type StubUserRepository struct {
 	GetAllFunc         func() ([]entity.User, error)
 	GetByIDFunc        func(id int) (*entity.User, error)
 	GetByEmailFunc     func(email string) (*entity.User, error)
@@ -23,56 +23,56 @@ type MockUserRepository struct {
 	ChangePasswordFunc func(id int, newPassword string) error
 }
 
-func (m *MockUserRepository) GetAll() ([]entity.User, error) {
+func (m *StubUserRepository) GetAll() ([]entity.User, error) {
 	if m.GetAllFunc != nil {
 		return m.GetAllFunc()
 	}
 	return []entity.User{}, nil
 }
 
-func (m *MockUserRepository) GetByID(id int) (*entity.User, error) {
+func (m *StubUserRepository) GetByID(id int) (*entity.User, error) {
 	if m.GetByIDFunc != nil {
 		return m.GetByIDFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) GetByEmail(email string) (*entity.User, error) {
+func (m *StubUserRepository) GetByEmail(email string) (*entity.User, error) {
 	if m.GetByEmailFunc != nil {
 		return m.GetByEmailFunc(email)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) Create(user *entity.User) error {
+func (m *StubUserRepository) Create(user *entity.User) error {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(user)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
+func (m *StubUserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(id, requestUser)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) Delete(id int) error {
+func (m *StubUserRepository) Delete(id int) error {
 	if m.DeleteFunc != nil {
 		return m.DeleteFunc(id)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) EmailExists(email string) (bool, error) {
+func (m *StubUserRepository) EmailExists(email string) (bool, error) {
 	if m.EmailExistsFunc != nil {
 		return m.EmailExistsFunc(email)
 	}
 	return false, domain.ErrNotImplemented
 }
 
-func (m *MockUserRepository) ChangePassword(id int, newPassword string) error {
+func (m *StubUserRepository) ChangePassword(id int, newPassword string) error {
 	if m.ChangePasswordFunc != nil {
 		return m.ChangePassword(id, newPassword)
 	}
@@ -90,15 +90,19 @@ var testUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
+	UserNotificationSettings: entity.NotificationSettings{
+		IsEmailSend: true,
+		IsPhoneSend: false,
+	},
 }
 
 func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetAllFunc: func() ([]entity.User, error) {
 			return []entity.User{*testUser}, nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.GetAllUsers()
 	if err != nil {
@@ -107,12 +111,12 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.GetUserByID(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -121,12 +125,12 @@ func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByID_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testUser, nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.GetUserByID(1)
 	if err != nil {
@@ -135,12 +139,12 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByEmailFunc: func(email string) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.GetUserByEmail("email")
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -149,12 +153,12 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByEmailFunc: func(email string) (*entity.User, error) {
 			return testUser, nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.GetUserByEmail("email@mail.ru")
 	if err != nil {
@@ -163,12 +167,12 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 }
 
 func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		EmailExistsFunc: func(email string) (bool, error) {
 			return true, nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.CreateUser(&entity.CreateUserRequest{
 		Email:    "takenemail@mail.ru",
@@ -183,7 +187,7 @@ func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 }
 
 func TestUserUseCase_CreateUser_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, nil
 		},
@@ -194,7 +198,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 			return nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	_, err := useCase.CreateUser(&entity.CreateUserRequest{
 		Email:    "new@mail.ru",
@@ -209,12 +213,12 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 }
 
 func TestUserUseCase_UpdateUser_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 	req := &entity.UpdateUserRequest{
 		FIO:   new("new test fio"),
 		Phone: new("123123123"),
@@ -230,7 +234,7 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 	updatedFIO := "Updated Name"
 	updatedPhone := "+79999999999"
 
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testUser, nil
 		},
@@ -253,7 +257,7 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 		},
 	}
 
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 	req := &entity.UpdateUserRequest{
 		FIO:   &updatedFIO,
 		Phone: &updatedPhone,
@@ -266,12 +270,12 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 }
 
 func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		DeleteFunc: func(id int) error {
 			return domain.ErrUserNotFound
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	err := useCase.DeleteUser(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -280,12 +284,12 @@ func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_DeleteUser_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		DeleteFunc: func(id int) error {
 			return nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 
 	err := useCase.DeleteUser(1)
 	if err != nil {
@@ -294,12 +298,12 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 }
 
 func TestUserUseCase_ChangePassword_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
@@ -312,12 +316,12 @@ func TestUserUseCase_ChangePassword_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_ChangePassword_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{
+	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testUser, nil
 		},
 	}
-	useCase := usecase.NewUserUseCase(mockRepo)
+	useCase := usecase.NewUserUseCase(stubRepo)
 	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)

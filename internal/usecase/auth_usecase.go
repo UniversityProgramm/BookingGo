@@ -4,6 +4,8 @@ import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
+	"BookingGo/internal/enum"
+	"log"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,12 +18,24 @@ type UserUseCaseInterface interface {
 	ChangePassword(id int, newPassword string) error
 }
 
-type AuthUseCase struct {
-	userUseCase UserUseCaseInterface
+type AuthNotifier interface {
+	CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
 }
 
-func NewAuthUseCase(userUsec UserUseCaseInterface) *AuthUseCase {
-	return &AuthUseCase{userUseCase: userUsec}
+type AuthUseCase struct {
+	userUseCase UserUseCaseInterface
+	notifier    AuthNotifier
+}
+
+func NewAuthUseCase(userUseCase UserUseCaseInterface, notifier AuthNotifier) *AuthUseCase {
+	return &AuthUseCase{userUseCase: userUseCase, notifier: notifier}
+}
+
+func (a *AuthUseCase) SendAuthNotification(userID int, bookingType enum.TypeOfNotification, params entity.NotificationParams) {
+	err := a.notifier.CreateNotification(userID, bookingType, params)
+	if err != nil {
+		log.Printf("[Notifications] Ошибка при создании уведомления авторизации: %v", err.Error())
+	}
 }
 
 func (a *AuthUseCase) Login(email string, password string) (string, error) {
@@ -40,6 +54,11 @@ func (a *AuthUseCase) Login(email string, password string) (string, error) {
 		return "", err
 	}
 
+	params := entity.NotificationParams{
+		IP: "127.0.0.1",
+	}
+	a.SendAuthNotification(user.ID, enum.AuthType, params)
+
 	return token, nil
 }
 
@@ -57,11 +76,11 @@ func (a *AuthUseCase) Register(req *entity.CreateUserRequest) (string, error) {
 	return token, nil
 }
 
-func (a *AuthUseCase) GetUserByID(id int) (*entity.User, error) {
+func (a *AuthUseCase) GetMe(id int) (*entity.User, error) {
 	return a.userUseCase.GetUserByID(id)
 }
 
-func (a *AuthUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+func (a *AuthUseCase) UpdateMe(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 	return a.userUseCase.UpdateUser(id, req)
 }
 

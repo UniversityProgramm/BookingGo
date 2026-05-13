@@ -1,12 +1,122 @@
 package usecase
 
+import (
+	"BookingGo/internal/customTemplates"
+	"BookingGo/internal/entity"
+	"BookingGo/internal/enum"
+	"fmt"
+	"log"
+	"strings"
+)
+
 type NotificationRepository interface {
+	UpdateSettings(userID int, req *entity.NotificationSettings) error
+	GetAllNotificationsByUserID(userID int) ([]entity.Notification, error)
+	MarkAllAsRead(recipientID int) error
+	CreateNotif(notification *entity.Notification) error
 }
 
 type NotificationUseCase struct {
 	notificationRepo NotificationRepository
+	bookingRepo      BookingRepository
+	userRepo         UserRepository
 }
 
 func NewNotificationUseCase(notificationRepo NotificationRepository) *NotificationUseCase {
 	return &NotificationUseCase{notificationRepo: notificationRepo}
+}
+
+func (n *NotificationUseCase) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
+	user, err := n.userRepo.GetByID(userID)
+	if err != nil {
+		return err
+	}
+
+	booking, err := n.bookingRepo.GetBookingByID(params.BookingID)
+	if err != nil {
+		return err
+	}
+
+	text, title := buildTextAndTitle(notificationType, user, booking, params)
+	newNotification := &entity.Notification{
+		RecipientID: userID,
+		Title:       title,
+		Body:        text,
+		IsRead:      false,
+	}
+	err = n.notificationRepo.CreateNotif(newNotification)
+	if err != nil {
+		return err
+	}
+
+	if user.UserNotificationSettings.IsEmailSend {
+		if err := sendToEmail(user.Email, title, text); err != nil {
+			return err
+		}
+	}
+	if user.UserNotificationSettings.IsPhoneSend {
+		if err := sendToPhone(user.Phone, title, text); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.User, booking *entity.Booking, params entity.NotificationParams) (string, string) {
+	tmplData := map[string]interface{}{
+		"UserName":    strings.TrimSpace(user.FIO),
+		"BookingDate": booking.SlotStart.Format("02.01.2006 15:04"),
+		"Message":     strings.TrimSpace(booking.ProblemDescription),
+		"IP":          params.IP,
+	}
+
+	switch notificationType {
+	case enum.NewBookingType:
+		return renderNotificationTemplate("booking_created", tmplData), "Вы совершили запись"
+	case enum.CancelBookingType:
+		return renderNotificationTemplate("booking_canceled", tmplData), "Вы отменили запись"
+	case enum.AuthType:
+		return renderNotificationTemplate("booking_auth", tmplData), "Вы вошли в аккаунт"
+	case enum.CompleteBookingType:
+		return renderNotificationTemplate("booking_completed", tmplData), "Статус вашей записи был изменен"
+	default:
+		log.Printf("[Notifications] Неизвестный тип уведомления")
+		return "Неизвестный тип уведомления", "Получено новое уведомление"
+	}
+
+}
+
+func renderNotificationTemplate(name string, data map[string]interface{}) string {
+	tmpl, ok := customTemplates.NotificationTemplates[name]
+	if !ok {
+		return "Уведомления с таким ключом шаблона не существует"
+	}
+
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Sprintf("Ошибка генерации текста: %v", err)
+	}
+
+	return strings.TrimSpace(buf.String())
+}
+
+func sendToEmail(email string, title string, text string) error {
+	return nil
+}
+
+func sendToPhone(phone string, title string, text string) error {
+	return nil
+}
+
+func (n *NotificationUseCase) GetMyNotifications(userID int) ([]entity.Notification, error) {
+	return n.notificationRepo.GetAllNotificationsByUserID(userID)
+}
+
+func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity.NotificationSettings) error {
+	return n.notificationRepo.UpdateSettings(userID, req)
+}
+
+func (n *NotificationUseCase) MarkAllAsRead(userID int) error {
+	return n.notificationRepo.MarkAllAsRead(userID)
 }
