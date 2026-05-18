@@ -15,27 +15,21 @@ type BookingRepository interface {
 	GetBookingByID(id int) (*entity.Booking, error)
 	SetBookingComplete(bookingID int) (*entity.Booking, error)
 	SetBookingCancel(bookingID, userID int) (*entity.Booking, error)
+	GetAll() ([]entity.Booking, error)
 }
 
-type BookingNotifier interface {
-	CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
+type OutboxBookingRepository interface {
+	CreateEvent(event *entity.OutboxEvent) error
 }
 
 type BookingUseCase struct {
 	bookingRepo BookingRepository
 	userRepo    UserRepository
-	notifier    BookingNotifier
+	outboxRepo  OutboxBookingRepository
 }
 
-func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, notifier BookingNotifier) *BookingUseCase {
-	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo, notifier: notifier}
-}
-
-func (b *BookingUseCase) SendBookingNotification(userID int, bookingType enum.TypeOfNotification, params entity.NotificationParams) {
-	err := b.notifier.CreateNotification(userID, bookingType, params)
-	if err != nil {
-		log.Printf("[Notifications] Ошибка при создании уведомления: %v", err.Error())
-	}
+func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, outboxRepo OutboxBookingRepository) *BookingUseCase {
+	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo, outboxRepo: outboxRepo}
 }
 
 func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
@@ -72,23 +66,35 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 		return nil, err
 	}
 
-	params := entity.NotificationParams{
-		BookingID: booking.ID,
+	payload := map[string]any{
+		"user_id":    user.ID,
+		"booking_id": booking.ID,
 	}
-	b.SendBookingNotification(user.ID, enum.NewBookingType, params)
+	outboxEvent, err := entity.NewOutboxEvent(enum.NewBookingType, payload)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.NewBookingType, err.Error())
+	}
+
+	err = b.outboxRepo.CreateEvent(outboxEvent)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.NewBookingType, err.Error())
+	}
 
 	return booking, nil
 }
 
-func (b *BookingUseCase) CompleteBookingByID(bookingID int, userID int) (*entity.Booking, error) {
+func (b *BookingUseCase) GetAllBookings(userID int) ([]entity.Booking, error) {
 	user, err := b.userRepo.GetByID(userID)
 	if err != nil {
 		return nil, err
 	}
-	if user.Role != enum.RoleStaff {
-		return nil, domain.ErrOnlyForStaff
+	if user.Role == enum.RoleClient {
+		return nil, domain.ErrOnlyForStaffOrAdmin
 	}
+	return b.bookingRepo.GetAll()
+}
 
+func (b *BookingUseCase) CompleteBookingByID(bookingID int) (*entity.Booking, error) {
 	booking, err := b.bookingRepo.GetBookingByID(bookingID)
 	if err != nil {
 		return nil, err
@@ -98,10 +104,19 @@ func (b *BookingUseCase) CompleteBookingByID(bookingID int, userID int) (*entity
 		return nil, domain.ErrBookingNotFinished
 	}
 
-	params := entity.NotificationParams{
-		BookingID: booking.ID,
+	payload := map[string]any{
+		"user_id":    booking.UserID,
+		"booking_id": booking.ID,
 	}
-	b.SendBookingNotification(booking.UserID, enum.CompleteBookingType, params)
+	outboxEvent, err := entity.NewOutboxEvent(enum.CompleteBookingType, payload)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.CompleteBookingType, err.Error())
+	}
+
+	err = b.outboxRepo.CreateEvent(outboxEvent)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.CompleteBookingType, err.Error())
+	}
 
 	return b.bookingRepo.SetBookingComplete(bookingID)
 }
@@ -122,10 +137,19 @@ func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
 
 	_, err = b.bookingRepo.SetBookingCancel(bookingID, userID)
 
-	params := entity.NotificationParams{
-		BookingID: booking.ID,
+	payload := map[string]any{
+		"user_id":    userID,
+		"booking_id": bookingID,
 	}
-	b.SendBookingNotification(userID, enum.CancelBookingType, params)
+	outboxEvent, err := entity.NewOutboxEvent(enum.CancelBookingType, payload)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.CancelBookingType, err.Error())
+	}
+
+	err = b.outboxRepo.CreateEvent(outboxEvent)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.CancelBookingType, err.Error())
+	}
 
 	return err
 }

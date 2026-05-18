@@ -32,7 +32,6 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		bookingGroup.GET("", bookingController.GetMyBookings)
 		bookingGroup.POST("", bookingController.CreateBooking)
 		bookingGroup.POST("/cancelBooking/:id", bookingController.CancelMyBooking)
-		bookingGroup.POST("/completeBooking/:id", bookingController.CompleteBookingByID)
 	}
 
 	notificationController := NewNotificationController(notificationUseCase)
@@ -42,7 +41,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		notificationGroup.PATCH("/settings", notificationController.UpdateNotificationSettings)
 	}
 
-	staffGroup := api.Group("")
+	staffGroup := api.Group("/staffPanel")
 	staffGroup.Use(middleware.AuthMiddleware())
 	staffGroup.Use(middleware.StaffOnly())
 	{
@@ -53,14 +52,20 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 			usersGroup.GET("/:id", userController.GetUserByID)
 			usersGroup.GET("/email/:email", userController.GetUserByEmail)
 		}
+		bookingStaffController := NewBookingController(bookingUseCase)
+		bookingStaffGroup := staffGroup.Group("/bookings")
+		{
+			bookingStaffGroup.GET("", bookingStaffController.GetAllBookings)
+			bookingStaffGroup.POST("/completeBooking/:id", bookingController.CompleteBookingByID)
+		}
 	}
 
-	adminGroup := api.Group("")
+	adminGroup := api.Group("/adminPanel")
 	adminGroup.Use(middleware.AuthMiddleware())
 	adminGroup.Use(middleware.AdminOnly())
 	{
 		userController := NewUserController(userUseCase)
-		usersGroup := adminGroup.Group("/adminPanel/users")
+		usersGroup := adminGroup.Group("/users")
 		{
 			usersGroup.GET("", userController.GetAllUsers)
 			usersGroup.GET("/:id", userController.GetUserByID)
@@ -68,6 +73,11 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 			usersGroup.POST("", userController.CreateUser)
 			usersGroup.PUT("/:id", userController.UpdateUser)
 			usersGroup.DELETE("/:id", userController.DeleteUser)
+		}
+		bookingAdminController := NewBookingController(bookingUseCase)
+		bookingAdminGroup := adminGroup.Group("/bookings")
+		{
+			bookingAdminGroup.GET("", bookingAdminController.GetAllBookings)
 		}
 	}
 }

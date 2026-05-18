@@ -34,6 +34,12 @@ func (r *BookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) 
 	return count == 0, nil
 }
 
+func (r *BookingRepository) GetAll() ([]entity.Booking, error) {
+	var bookings []entity.Booking
+	result := r.db.Find(&bookings)
+	return bookings, result.Error
+}
+
 func (r *BookingRepository) GetAllBookingsByUserID(id int) ([]entity.Booking, error) {
 	var bookings []entity.Booking
 	err := r.db.Where("user_id = ?", id).Order("slot_start ASC").Find(&bookings).Error

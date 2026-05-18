@@ -17,6 +17,7 @@ type StubBookingRepository struct {
 	GetBookingByIDFunc         func(id int) (*entity.Booking, error)
 	SetBookingCompleteFunc     func(bookingID int) (*entity.Booking, error)
 	SetBookingCancelFunc       func(bookingID, userID int) (*entity.Booking, error)
+	GetAllFunc                 func() ([]entity.Booking, error)
 }
 
 type StubBookingNotifier struct {
@@ -68,6 +69,13 @@ func (m *StubBookingRepository) SetBookingComplete(bookingID int) (*entity.Booki
 func (m *StubBookingRepository) SetBookingCancel(bookingID, userID int) (*entity.Booking, error) {
 	if m.SetBookingCancelFunc != nil {
 		return m.SetBookingCancelFunc(bookingID, userID)
+	}
+	return nil, domain.ErrNotImplemented
+}
+
+func (m *StubBookingRepository) GetAll() ([]entity.Booking, error) {
+	if m.GetAllFunc != nil {
+		return m.GetAllFunc()
 	}
 	return nil, domain.ErrNotImplemented
 }
@@ -450,5 +458,72 @@ func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
 	}
 	if result.Status != enum.StatusCompleted {
 		t.Errorf("Статус не обновлен: %s", result.Status)
+	}
+}
+
+func TestBookingUseCase_GetAllBookings_OnlyForStaffOrAdmin(t *testing.T) {
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testClient, nil
+		},
+	}
+
+	stubBookingRepo := &StubBookingRepository{
+		GetAllFunc: func() ([]entity.Booking, error) {
+			return []entity.Booking{}, nil
+		},
+	}
+
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+
+	_, err := useCase.GetAllBookings(testClient.ID)
+
+	if !errors.Is(err, domain.ErrOnlyForStaffOrAdmin) {
+		t.Errorf("Ожидалась ошибка ErrOnlyForStaffOrAdmin, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+
+	stubBookingRepo := &StubBookingRepository{}
+	stubNotifier := &StubBookingNotifier{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+
+	_, err := useCase.GetAllBookings(999)
+
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetAllBookings_StaffSuccess(t *testing.T) {
+	expectedBookings := []entity.Booking{*testBooking, *testBookingPast}
+
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	stubBookingRepo := &StubBookingRepository{
+		GetAllFunc: func() ([]entity.Booking, error) {
+			return expectedBookings, nil
+		},
+	}
+
+	stubNotifier := &StubBookingNotifier{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+
+	_, err := useCase.GetAllBookings(testStaff.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
 }

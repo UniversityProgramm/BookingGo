@@ -15,7 +15,7 @@ type User struct {
 	CreatedAt                time.Time            `json:"created_at" gorm:"not null;autoCreateTime"`
 	UpdatedAt                time.Time            `json:"updated_at" gorm:"not null;autoUpdateTime"`
 	IsActive                 bool                 `json:"is_active"`
-	UserNotificationSettings NotificationSettings `json:"user_notification_settings" gorm:"type:json;serializer:json;not null"`
+	UserNotificationSettings NotificationSettings `json:"notification_settings" gorm:"type:json;serializer:json;column:notification_settings;not null"`
 }
 
 type CreateUserRequest struct {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 type NotificationRepository interface {
@@ -22,8 +23,8 @@ type NotificationUseCase struct {
 	userRepo         UserRepository
 }
 
-func NewNotificationUseCase(notificationRepo NotificationRepository) *NotificationUseCase {
-	return &NotificationUseCase{notificationRepo: notificationRepo}
+func NewNotificationUseCase(notificationRepo NotificationRepository, bookingRepo BookingRepository, userRepo UserRepository) *NotificationUseCase {
+	return &NotificationUseCase{notificationRepo: notificationRepo, bookingRepo: bookingRepo, userRepo: userRepo}
 }
 
 func (n *NotificationUseCase) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
@@ -32,9 +33,12 @@ func (n *NotificationUseCase) CreateNotification(userID int, notificationType en
 		return err
 	}
 
-	booking, err := n.bookingRepo.GetBookingByID(params.BookingID)
-	if err != nil {
-		return err
+	var booking *entity.Booking
+	if params.BookingID > 0 {
+		booking, err = n.bookingRepo.GetBookingByID(params.BookingID)
+		if err != nil {
+			booking = nil
+		}
 	}
 
 	text, title := buildTextAndTitle(notificationType, user, booking, params)
@@ -64,11 +68,19 @@ func (n *NotificationUseCase) CreateNotification(userID int, notificationType en
 }
 
 func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.User, booking *entity.Booking, params entity.NotificationParams) (string, string) {
+	bookingDate := ""
+	message := ""
+	if booking != nil {
+		bookingDate = booking.SlotStart.Format("02.01.2006 15:04")
+		message = strings.TrimSpace(booking.ProblemDescription)
+	}
+
 	tmplData := map[string]interface{}{
 		"UserName":    strings.TrimSpace(user.FIO),
-		"BookingDate": booking.SlotStart.Format("02.01.2006 15:04"),
-		"Message":     strings.TrimSpace(booking.ProblemDescription),
+		"BookingDate": bookingDate,
+		"Message":     message,
 		"IP":          params.IP,
+		"DateNow":     time.Now().Format("02.01.2006 15:04"),
 	}
 
 	switch notificationType {
@@ -102,10 +114,12 @@ func renderNotificationTemplate(name string, data map[string]interface{}) string
 }
 
 func sendToEmail(email string, title string, text string) error {
+	log.Println("[EmailService] Отправили письмо с уведомлением на почту")
 	return nil
 }
 
 func sendToPhone(phone string, title string, text string) error {
+	log.Println("[SmsService] Отправили смс с уведомлением на телефон")
 	return nil
 }
 

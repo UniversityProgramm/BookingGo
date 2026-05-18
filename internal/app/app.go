@@ -5,6 +5,7 @@ import (
 	"BookingGo/internal/controller"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
+	"BookingGo/internal/worker"
 	"BookingGo/pkg/db"
 	"log"
 	"os"
@@ -25,11 +26,15 @@ func Run(router *gin.Engine) {
 	userRepo := repository.NewUserRepository(db.DB)
 	bookingRepo := repository.NewBookingRepository(db.DB)
 	notificationRepo := repository.NewNotificationRepository(db.DB)
+	outboxRepo := repository.NewOutboxRepository(db.DB)
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
-	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo)
-	authUseCase := usecase.NewAuthUseCase(userUseCase, notificationUseCase)
-	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, notificationUseCase)
+	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo)
+	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo)
+	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, outboxRepo)
+
+	outboxWorker := worker.NewOutboxWorker(outboxRepo, notificationUseCase)
+	go outboxWorker.Start()
 
 	controller.SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
 }

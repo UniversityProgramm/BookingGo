@@ -6,7 +6,7 @@ import (
 
 type Notification struct {
 	ID          int       `json:"id" gorm:"primaryKey;autoIncrement"`
-	RecipientID int       `json:"recipient_id" gorm:"not null"`
+	RecipientID int       `json:"-" gorm:"not null"`
 	Title       string    `json:"title" gorm:"not null"`
 	Body        string    `json:"body" gorm:"not null"`
 	IsRead      bool      `json:"is_read" gorm:"not null"`

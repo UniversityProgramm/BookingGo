@@ -63,7 +63,7 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 		return
 	}
 
-	booking, err := bc.bookingUseCase.CompleteBookingByID(bookingID, currentUser.UserID)
+	booking, err := bc.bookingUseCase.CompleteBookingByID(bookingID)
 	if err != nil {
 		if errors.Is(err, domain.ErrOnlyForStaff) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Ошибка, изменение статуса записи доступно только персоналу"})
@@ -78,6 +78,22 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, booking)
+}
+
+func (bc *BookingController) GetAllBookings(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	bookings, err := bc.bookingUseCase.GetAllBookings(currentUser.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка загрузки записей"})
+		return
+	}
+
+	c.JSON(http.StatusOK, bookings)
 }
 
 func (bc *BookingController) GetMyBookings(c *gin.Context) {

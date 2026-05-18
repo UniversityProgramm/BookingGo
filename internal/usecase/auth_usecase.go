@@ -18,24 +18,17 @@ type UserUseCaseInterface interface {
 	ChangePassword(id int, newPassword string) error
 }
 
-type AuthNotifier interface {
-	CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
+type OutboxAuthRepository interface {
+	CreateEvent(event *entity.OutboxEvent) error
 }
 
 type AuthUseCase struct {
 	userUseCase UserUseCaseInterface
-	notifier    AuthNotifier
+	outboxRepo  OutboxAuthRepository
 }
 
-func NewAuthUseCase(userUseCase UserUseCaseInterface, notifier AuthNotifier) *AuthUseCase {
-	return &AuthUseCase{userUseCase: userUseCase, notifier: notifier}
-}
-
-func (a *AuthUseCase) SendAuthNotification(userID int, bookingType enum.TypeOfNotification, params entity.NotificationParams) {
-	err := a.notifier.CreateNotification(userID, bookingType, params)
-	if err != nil {
-		log.Printf("[Notifications] Ошибка при создании уведомления авторизации: %v", err.Error())
-	}
+func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxAuthRepository) *AuthUseCase {
+	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo}
 }
 
 func (a *AuthUseCase) Login(email string, password string) (string, error) {
@@ -54,10 +47,20 @@ func (a *AuthUseCase) Login(email string, password string) (string, error) {
 		return "", err
 	}
 
-	params := entity.NotificationParams{
-		IP: "127.0.0.1",
+	payload := map[string]any{
+		"user_id":    user.ID,
+		"booking_id": -1,
+		"ip":         "127.0.0.1",
 	}
-	a.SendAuthNotification(user.ID, enum.AuthType, params)
+	outboxEvent, err := entity.NewOutboxEvent(enum.AuthType, payload)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.AuthType, err.Error())
+	}
+
+	err = a.outboxRepo.CreateEvent(outboxEvent)
+	if err != nil {
+		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.AuthType, err.Error())
+	}
 
 	return token, nil
 }

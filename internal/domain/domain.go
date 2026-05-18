@@ -20,4 +20,5 @@ var (
 	ErrBookingNotFinished        = errors.New("booking not finished")
 	ErrNotificationsAlreadyRead  = errors.New("all notifications is already read")
 	ErrBookingAlreadyActive      = errors.New("booking is active right now")
+	ErrOnlyForStaffOrAdmin       = errors.New("only for staff or admin")
 )
