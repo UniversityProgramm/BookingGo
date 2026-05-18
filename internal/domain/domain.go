@@ -16,7 +16,6 @@ var (
 	ErrExpiredToken              = errors.New("token is expired")
 	ErrSigningMethodNotSupported = errors.New("signing method not supported")
 	ErrNotImplemented            = errors.New("not implemented")
-	ErrOnlyForStaff              = errors.New("available only for stuff")
 	ErrBookingNotFinished        = errors.New("booking not finished")
 	ErrNotificationsAlreadyRead  = errors.New("all notifications is already read")
 	ErrBookingAlreadyActive      = errors.New("booking is active right now")

@@ -18,15 +18,8 @@ type StubUserUseCase struct {
 	ChangePasswordFunc func(id int, newPassword string) error
 }
 
-type StubAuthNotifier struct {
-	CreateNotificationFunc func(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
-}
-
-func (m *StubAuthNotifier) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
-	if m.CreateNotificationFunc != nil {
-		return m.CreateNotificationFunc(userID, notificationType, params)
-	}
-	return nil
+type StubOutboxAuthRepository struct {
+	CreateEventFunc func(event *entity.OutboxEvent) error
 }
 
 func (m *StubUserUseCase) GetUserByEmail(email string) (*entity.User, error) {
@@ -64,6 +57,13 @@ func (m *StubUserUseCase) ChangePassword(id int, newPassword string) error {
 	return domain.ErrNotImplemented
 }
 
+func (m *StubOutboxAuthRepository) CreateEvent(event *entity.OutboxEvent) error {
+	if m.CreateEventFunc != nil {
+		return m.CreateEventFunc(event)
+	}
+	return nil
+}
+
 var testAuthUser = &entity.User{
 	ID:           1,
 	Email:        "test@example.com",
@@ -87,7 +87,7 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Login("notfound@example.com", "password123")
 	if !errors.Is(err, domain.ErrInvalidEmail) {
@@ -102,7 +102,7 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Login("test@example.com", "wrong_password")
 	if !errors.Is(err, domain.ErrInvalidPassword) {
@@ -120,7 +120,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	token, err := authUseCase.Login("test@example.com", "password123")
 
@@ -139,7 +139,7 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "taken@example.com",
@@ -168,7 +168,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	token, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "newuser@example.com",
@@ -192,7 +192,7 @@ func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.GetMe(1)
 
@@ -208,7 +208,7 @@ func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.GetMe(1)
 
@@ -224,7 +224,7 @@ func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
@@ -242,7 +242,7 @@ func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserRequest{
 		Phone: new("+79991234567"),
@@ -260,7 +260,7 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "old",
@@ -279,7 +279,7 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "wrong",
@@ -298,7 +298,7 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -320,7 +320,7 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubAuthNotifier{}
+	stubNotifier := &StubOutboxAuthRepository{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",

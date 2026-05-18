@@ -20,15 +20,8 @@ type StubBookingRepository struct {
 	GetAllFunc                 func() ([]entity.Booking, error)
 }
 
-type StubBookingNotifier struct {
-	CreateNotificationFunc func(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error
-}
-
-func (m *StubBookingNotifier) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
-	if m.CreateNotificationFunc != nil {
-		return m.CreateNotificationFunc(userID, notificationType, params)
-	}
-	return nil
+type StubOutboxBookingRepository struct {
+	CreateEventFunc func(event *entity.OutboxEvent) error
 }
 
 func (m *StubBookingRepository) Create(booking *entity.Booking) error {
@@ -78,6 +71,13 @@ func (m *StubBookingRepository) GetAll() ([]entity.Booking, error) {
 		return m.GetAllFunc()
 	}
 	return nil, domain.ErrNotImplemented
+}
+
+func (m *StubOutboxBookingRepository) CreateEvent(event *entity.OutboxEvent) error {
+	if m.CreateEventFunc != nil {
+		return m.CreateEventFunc(event)
+	}
+	return nil
 }
 
 var (
@@ -141,7 +141,7 @@ func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(-1 * time.Hour),
@@ -167,7 +167,7 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	futureTime := time.Now().Add(24 * time.Hour)
@@ -191,7 +191,7 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
@@ -223,7 +223,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	req := &entity.CreateBookingRequest{
@@ -254,7 +254,7 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	}
 	stubUserRepo := &StubUserRepository{} // не используется в этом методе
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
@@ -272,7 +272,7 @@ func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
 	}
 	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	_, err := useCase.GetMyBookings(testClient.ID)
 
@@ -292,7 +292,7 @@ func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
 	}
 	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	err := useCase.CancelMyBooking(999, testClient.ID)
 
@@ -309,7 +309,7 @@ func TestBookingUseCase_CancelMyBooking_BookingAlreadyActive(t *testing.T) {
 	}
 	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	err := useCase.CancelMyBooking(10, testClient.ID)
 
@@ -330,7 +330,7 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 	}
 	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	err := useCase.CancelMyBooking(10, testClient.ID)
 
@@ -359,7 +359,7 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          newStart,
@@ -370,23 +370,6 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrSlotNotAvailable) {
 		t.Errorf("Ожидалась ошибка ErrSlotNotAvailable для пересекающегося слота, получена: %v", err)
-	}
-}
-
-func TestBookingUseCase_CompleteBooking_NotStaff(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{}
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testClient, nil
-		},
-	}
-
-	stubNotifier := &StubBookingNotifier{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.CompleteBookingByID(100, 2)
-
-	if !errors.Is(err, domain.ErrOnlyForStaff) {
-		t.Errorf("Ожидалась ошибка ErrOnlyForStaff, получена: %v", err)
 	}
 }
 
@@ -402,9 +385,9 @@ func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.CompleteBookingByID(100, 3)
+	_, err := useCase.CompleteBookingByID(100)
 
 	if !errors.Is(err, domain.ErrBookingNotFound) {
 		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
@@ -423,9 +406,9 @@ func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.CompleteBookingByID(101, 1)
+	_, err := useCase.CompleteBookingByID(101)
 
 	if !errors.Is(err, domain.ErrBookingNotFinished) {
 		t.Errorf("Ожидалась ошибка ErrBookingNotFinished, получена: %v", err)
@@ -449,9 +432,9 @@ func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	result, err := useCase.CompleteBookingByID(100, 1)
+	result, err := useCase.CompleteBookingByID(100)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -474,7 +457,7 @@ func TestBookingUseCase_GetAllBookings_OnlyForStaffOrAdmin(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	_, err := useCase.GetAllBookings(testClient.ID)
@@ -492,7 +475,7 @@ func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
 	}
 
 	stubBookingRepo := &StubBookingRepository{}
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 
 	_, err := useCase.GetAllBookings(999)
@@ -517,7 +500,7 @@ func TestBookingUseCase_GetAllBookings_StaffSuccess(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubBookingNotifier{}
+	stubNotifier := &StubOutboxBookingRepository{}
 
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 

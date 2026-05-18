@@ -65,9 +65,7 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 
 	booking, err := bc.bookingUseCase.CompleteBookingByID(bookingID)
 	if err != nil {
-		if errors.Is(err, domain.ErrOnlyForStaff) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Ошибка, изменение статуса записи доступно только персоналу"})
-		} else if errors.Is(err, domain.ErrBookingNotFound) {
+		if errors.Is(err, domain.ErrBookingNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Такая запись не найдена"})
 		} else if errors.Is(err, domain.ErrBookingNotFinished) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Время конца записи еще не прошло, нельзя поменять статус записи"})
