@@ -141,3 +141,32 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Пароль успешно изменен"})
 }
+
+func (ac *AuthController) ChangeEmail(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	userID := currentUser.UserID
+	var req entity.ChangeEmailRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
+		return
+	}
+
+	err := ac.authUseCase.ChangeEmail(userID, &req)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		} else if errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены почты"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Почта успешно изменена"})
+}

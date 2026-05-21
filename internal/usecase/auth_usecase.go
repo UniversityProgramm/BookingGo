@@ -16,6 +16,7 @@ type UserUseCaseInterface interface {
 	GetUserByID(id int) (*entity.User, error)
 	UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error)
 	ChangePassword(id int, newPassword string) error
+	ChangeEmail(id int, newEmail string) error
 }
 
 type OutboxAuthRepository interface {
@@ -109,4 +110,18 @@ func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) 
 	}
 
 	return a.userUseCase.ChangePassword(user.ID, string(newHashPassword))
+}
+
+func (a *AuthUseCase) ChangeEmail(id int, req *entity.ChangeEmailRequest) error {
+	user, err := a.userUseCase.GetUserByID(id)
+	if err != nil {
+		return domain.ErrUserNotFound
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.ConfirmPassword))
+	if err != nil {
+		return domain.ErrCurPasswordIsNotCorrect
+	}
+
+	return a.userUseCase.ChangeEmail(user.ID, req.NewEmail)
 }

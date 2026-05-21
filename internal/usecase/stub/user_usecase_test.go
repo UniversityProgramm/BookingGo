@@ -13,14 +13,13 @@ import (
 )
 
 type StubUserRepository struct {
-	GetAllFunc         func() ([]entity.User, error)
-	GetByIDFunc        func(id int) (*entity.User, error)
-	GetByEmailFunc     func(email string) (*entity.User, error)
-	CreateFunc         func(user *entity.User) error
-	UpdateFunc         func(id int, requestUser map[string]interface{}) (*entity.User, error)
-	DeleteFunc         func(id int) error
-	EmailExistsFunc    func(email string) (bool, error)
-	ChangePasswordFunc func(id int, newPassword string) error
+	GetAllFunc      func() ([]entity.User, error)
+	GetByIDFunc     func(id int) (*entity.User, error)
+	GetByEmailFunc  func(email string) (*entity.User, error)
+	CreateFunc      func(user *entity.User) error
+	UpdateFunc      func(id int, requestUser map[string]interface{}) (*entity.User, error)
+	DeleteFunc      func(id int) error
+	EmailExistsFunc func(email string) (bool, error)
 }
 
 func (m *StubUserRepository) GetAll() ([]entity.User, error) {
@@ -70,13 +69,6 @@ func (m *StubUserRepository) EmailExists(email string) (bool, error) {
 		return m.EmailExistsFunc(email)
 	}
 	return false, domain.ErrNotImplemented
-}
-
-func (m *StubUserRepository) ChangePassword(id int, newPassword string) error {
-	if m.ChangePasswordFunc != nil {
-		return m.ChangePassword(id, newPassword)
-	}
-	return domain.ErrNotImplemented
 }
 
 // Тесты

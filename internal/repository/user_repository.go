@@ -53,7 +53,7 @@ func (r *UserRepository) Create(user *entity.User) error {
 	return result.Error
 }
 
-func (r *UserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
+func (r *UserRepository) Update(id int, requestUser map[string]any) (*entity.User, error) {
 	result := r.db.Model(&entity.User{}).Where("id = ?", id).Updates(requestUser)
 	if result.Error != nil {
 		return nil, result.Error
@@ -85,16 +85,4 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 	}
 
 	return count > 0, nil
-}
-
-func (r *UserRepository) ChangePassword(id int, newPassword string) error {
-	result := r.db.Model(&entity.User{}).Where("id = ?", id).Update("password_hash", newPassword)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return domain.ErrUserNotFound
-	}
-
-	return nil
 }

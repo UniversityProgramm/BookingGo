@@ -1,6 +1,7 @@
-package controller
+package app
 
 import (
+	"BookingGo/internal/controller"
 	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 
@@ -11,7 +12,7 @@ import (
 func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *usecase.AuthUseCase, bookingUseCase *usecase.BookingUseCase, notificationUseCase *usecase.NotificationUseCase) {
 	api := r.Group("/api")
 
-	authController := NewAuthController(authUseCase)
+	authController := controller.NewAuthController(authUseCase)
 	authGroup := api.Group("/auth")
 	{
 		authGroup.POST("/login", authController.Login)
@@ -24,9 +25,10 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		protectedGroup.GET("", authController.GetMe)
 		protectedGroup.PUT("", authController.UpdateMe)
 		protectedGroup.PUT("/password", authController.ChangePassword)
+		protectedGroup.PUT("/email", authController.ChangeEmail)
 	}
 
-	bookingController := NewBookingController(bookingUseCase)
+	bookingController := controller.NewBookingController(bookingUseCase)
 	bookingGroup := protectedGroup.Group("/bookings")
 	{
 		bookingGroup.GET("", bookingController.GetMyBookings)
@@ -34,7 +36,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		bookingGroup.POST("/cancelBooking/:id", bookingController.CancelMyBooking)
 	}
 
-	notificationController := NewNotificationController(notificationUseCase)
+	notificationController := controller.NewNotificationController(notificationUseCase)
 	notificationGroup := protectedGroup.Group("/notifications")
 	{
 		notificationGroup.GET("", notificationController.GetMyNotifications)
@@ -45,14 +47,14 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 	staffGroup.Use(middleware.AuthMiddleware())
 	staffGroup.Use(middleware.StaffOnly())
 	{
-		userController := NewUserController(userUseCase)
+		userController := controller.NewUserController(userUseCase)
 		usersGroup := staffGroup.Group("/users")
 		{
 			usersGroup.GET("", userController.GetAllUsers)
 			usersGroup.GET("/:id", userController.GetUserByID)
 			usersGroup.GET("/email/:email", userController.GetUserByEmail)
 		}
-		bookingStaffController := NewBookingController(bookingUseCase)
+		bookingStaffController := controller.NewBookingController(bookingUseCase)
 		bookingStaffGroup := staffGroup.Group("/bookings")
 		{
 			bookingStaffGroup.GET("", bookingStaffController.GetAllBookings)
@@ -64,7 +66,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 	adminGroup.Use(middleware.AuthMiddleware())
 	adminGroup.Use(middleware.AdminOnly())
 	{
-		userController := NewUserController(userUseCase)
+		userController := controller.NewUserController(userUseCase)
 		usersGroup := adminGroup.Group("/users")
 		{
 			usersGroup.GET("", userController.GetAllUsers)
@@ -74,7 +76,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 			usersGroup.PUT("/:id", userController.UpdateUser)
 			usersGroup.DELETE("/:id", userController.DeleteUser)
 		}
-		bookingAdminController := NewBookingController(bookingUseCase)
+		bookingAdminController := controller.NewBookingController(bookingUseCase)
 		bookingAdminGroup := adminGroup.Group("/bookings")
 		{
 			bookingAdminGroup.GET("", bookingAdminController.GetAllBookings)

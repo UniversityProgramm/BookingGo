@@ -16,6 +16,7 @@ type StubUserUseCase struct {
 	GetMeFunc          func(id int) (*entity.User, error)
 	UpdateMeFunc       func(id int, req *entity.UpdateUserRequest) (*entity.User, error)
 	ChangePasswordFunc func(id int, newPassword string) error
+	ChangeEmailFunc    func(id int, newEmail string) error
 }
 
 type StubOutboxAuthRepository struct {
@@ -53,6 +54,13 @@ func (m *StubUserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*en
 func (m *StubUserUseCase) ChangePassword(id int, newPassword string) error {
 	if m.ChangePasswordFunc != nil {
 		return m.ChangePasswordFunc(id, newPassword)
+	}
+	return domain.ErrNotImplemented
+}
+
+func (m *StubUserUseCase) ChangeEmail(id int, newEmail string) error {
+	if m.ChangeEmailFunc != nil {
+		return m.ChangeEmailFunc(id, newEmail)
 	}
 	return domain.ErrNotImplemented
 }
@@ -325,6 +333,66 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "new",
+	})
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+
+	stubNotifier := &StubOutboxAuthRepository{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		ConfirmPassword: "old",
+		NewEmail:        "newemail@example.com",
+	})
+
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxAuthRepository{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		ConfirmPassword: "wrong",
+		NewEmail:        "newemail@example.com",
+	})
+
+	if !errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
+		t.Errorf("Ожидалась ошибка ErrCurPasswordIsNotCorrect, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetMeFunc: func(id int) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+		ChangeEmailFunc: func(id int, newEmail string) error {
+			return nil
+		},
+	}
+
+	stubNotifier := &StubOutboxAuthRepository{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		ConfirmPassword: "password123",
+		NewEmail:        "newemail@example.com",
 	})
 
 	if err != nil {

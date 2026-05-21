@@ -13,10 +13,9 @@ type UserRepository interface {
 	GetByID(id int) (*entity.User, error)
 	GetByEmail(email string) (*entity.User, error)
 	Create(user *entity.User) error
-	Update(id int, requestUser map[string]interface{}) (*entity.User, error)
+	Update(id int, requestUser map[string]any) (*entity.User, error)
 	Delete(id int) error
 	EmailExists(email string) (bool, error)
-	ChangePassword(id int, newPassword string) error
 }
 
 type UserUseCase struct {
@@ -78,7 +77,7 @@ func (u *UserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 		return nil, domain.ErrUserNotFound
 	}
 
-	updates := map[string]interface{}{}
+	updates := map[string]any{}
 	if req.FIO != nil {
 		updates["fio"] = *req.FIO
 	}
@@ -99,8 +98,22 @@ func (u *UserUseCase) ChangePassword(id int, newPassword string) error {
 		return domain.ErrUserNotFound
 	}
 
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"password_hash": string(newPassword),
+	}
+
+	_, err = u.userRepo.Update(id, updates)
+	return err
+}
+
+func (u *UserUseCase) ChangeEmail(id int, newEmail string) error {
+	_, err := u.userRepo.GetByID(id)
+	if err != nil {
+		return domain.ErrUserNotFound
+	}
+
+	updates := map[string]any{
+		"email": newEmail,
 	}
 
 	_, err = u.userRepo.Update(id, updates)

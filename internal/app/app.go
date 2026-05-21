@@ -2,7 +2,6 @@ package app
 
 import (
 	"BookingGo/internal/auth"
-	"BookingGo/internal/controller"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
 	"BookingGo/internal/worker"
@@ -38,6 +37,6 @@ func Run(router *gin.Engine) {
 	go outboxWorker.Start()
 	logger.Log.Info("[app] Outbox worker is running")
 
-	controller.SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
+	SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
 	logger.Log.Info("[app] Router is running")
 }
