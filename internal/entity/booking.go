@@ -18,5 +18,5 @@ type Booking struct {
 
 type CreateBookingRequest struct {
 	SlotStart          time.Time `json:"slot_start" binding:"required"`
-	ProblemDescription string    `json:"problem_description" binding:"required"`
+	ProblemDescription string    `json:"problem_description"`
 }

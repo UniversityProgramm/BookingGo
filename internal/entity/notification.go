@@ -22,9 +22,3 @@ type NotificationParams struct {
 	BookingID int    `json:"booking_id,omitempty"`
 	IP        string `json:"ip,omitempty"`
 }
-
-type NotificationRequestEmail struct {
-}
-
-type NotificationRequestSMS struct {
-}

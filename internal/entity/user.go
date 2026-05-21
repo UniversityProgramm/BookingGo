@@ -27,7 +27,7 @@ type CreateUserRequest struct {
 
 type UpdateUserRequest struct {
 	FIO   *string `json:"fio"`
-	Phone *string `json:"phone"`
+	Phone *string `json:"phone,min=10,max=15"`
 }
 
 type ChangePasswordRequest struct {
