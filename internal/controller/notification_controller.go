@@ -6,7 +6,6 @@ import (
 	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,9 +36,17 @@ func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 		err = nc.notificationUseCase.MarkAllAsRead(currentUser.UserID)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotificationsAlreadyRead) {
-				log.Println("Все уведомления уже прочитаны")
+				c.JSON(http.StatusOK, gin.H{
+					"notifications": notifications,
+					"warning":       "Все уведомления уже прочитаны"},
+				)
 			}
-			log.Printf("Уведомления получены, но не удалось пометить их как прочитанные: %v", err)
+
+			c.JSON(http.StatusOK, gin.H{
+				"notifications": notifications,
+				"warning":       "Уведомления получены, но не удалось пометить их как прочитанные"},
+			)
+
 		}
 	}
 

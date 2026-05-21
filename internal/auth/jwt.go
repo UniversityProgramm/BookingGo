@@ -3,8 +3,8 @@ package auth
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/enum"
+	"BookingGo/pkg/logger"
 	"errors"
-	"log"
 	"os"
 	"time"
 
@@ -23,7 +23,7 @@ type Claims struct {
 func InitAuth() {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		log.Fatal("Переменная окружения JWT_SECRET не задана")
+		logger.Fatal("[jwt] JWT_SECRET.env is not set")
 	}
 
 	jwtSecret = []byte(secret)

@@ -2,7 +2,7 @@ package main
 
 import (
 	"BookingGo/internal/app"
-	"log"
+	"BookingGo/pkg/logger"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -11,19 +11,23 @@ import (
 
 func main() {
 	if loadErr := godotenv.Load(); loadErr != nil {
-		log.Fatal("Error loading .env file")
+		logger.Init()
+		logger.Fatal("[main] Error loading .env file", "error", loadErr.Error())
 	}
+	logger.Init()
+	logger.Log.Info("[main] Starting app...", "version", "1.0.0")
 
+	logger.Log.Info("[main] Starting router...")
 	router := gin.Default()
 	app.Run(router)
+	logger.Log.Info("[main] Router is initialized")
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.SetOutput(os.Stdout)
-	log.Printf("\n\nСервер запущен на порте %s\n\n", port)
 	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Ошибка запуска сервера:", err)
+		logger.Fatal("[main] Failed to run server", "error", err.Error())
 	}
+	logger.Log.Info("[main] Server is running", "port", port)
 }

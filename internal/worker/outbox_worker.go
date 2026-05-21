@@ -5,8 +5,8 @@ import (
 	"BookingGo/internal/enum"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
+	"BookingGo/pkg/logger"
 	"encoding/json"
-	"log"
 	"time"
 )
 
@@ -25,7 +25,7 @@ func NewOutboxWorker(outboxRepo *repository.OutboxRepository, notifUseCase *usec
 }
 
 func (w *OutboxWorker) Start() {
-	log.Println("[OutboxWorker] start]")
+	logger.Log.Info("[OutboxWorker] Starting outbox worker")
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -36,19 +36,19 @@ func (w *OutboxWorker) Start() {
 func (w *OutboxWorker) processBatch() {
 	events, err := w.outboxRepo.GetPendingEvents(50)
 	if err != nil {
-		log.Printf("[OutboxWorker] Ошибка получения событий: %v", err)
+		logger.Log.Error("[OutboxWorker] Failed to get pending events", "error", err.Error())
 		return
 	}
 
 	for _, event := range events {
 		if err := w.processEvent(event); err != nil {
-			log.Printf("[OutboxWorker] Ошибка обработки события %d: %v", event.ID, err)
+			logger.Log.Error("[OutboxWorker] Failed to process event", "eventID", event.ID, "error", err.Error())
 			if err := w.outboxRepo.MarkEventAsFailed(event.ID); err != nil {
-				log.Printf("[OutboxWorker] Не удалось пометить событие %d как failed: %v", event.ID, err)
+				logger.Log.Error("[OutboxWorker] Failed to mark event as failed", "eventID", event.ID, "error", err.Error())
 			}
 		} else {
 			if err := w.outboxRepo.MarkEventAsSent(event.ID); err != nil {
-				log.Printf("[OutboxWorker] Не удалось пометить событие %d как sent: %v", event.ID, err)
+				logger.Log.Error("[OutboxWorker] Failed to mark event as sent", "eventID", event.ID, "error", err.Error())
 			}
 		}
 	}

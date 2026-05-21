@@ -4,7 +4,7 @@ import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"log"
+	"BookingGo/pkg/logger"
 	"time"
 )
 
@@ -72,12 +72,12 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 	}
 	outboxEvent, err := entity.NewOutboxEvent(enum.NewBookingType, payload)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.NewBookingType, err.Error())
+		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 	}
 
 	err = b.outboxRepo.CreateEvent(outboxEvent)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.NewBookingType, err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 	}
 
 	return booking, nil
@@ -110,12 +110,12 @@ func (b *BookingUseCase) CompleteBookingByID(bookingID int) (*entity.Booking, er
 	}
 	outboxEvent, err := entity.NewOutboxEvent(enum.CompleteBookingType, payload)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.CompleteBookingType, err.Error())
+		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.CompleteBookingType, "error", err.Error())
 	}
 
 	err = b.outboxRepo.CreateEvent(outboxEvent)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.CompleteBookingType, err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.CompleteBookingType, "error", err.Error())
 	}
 
 	return b.bookingRepo.SetBookingComplete(bookingID)
@@ -143,12 +143,12 @@ func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
 	}
 	outboxEvent, err := entity.NewOutboxEvent(enum.CancelBookingType, payload)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.CancelBookingType, err.Error())
+		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.CancelBookingType, "error", err.Error())
 	}
 
 	err = b.outboxRepo.CreateEvent(outboxEvent)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.CancelBookingType, err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.CancelBookingType, "error", err.Error())
 	}
 
 	return err

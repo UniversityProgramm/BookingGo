@@ -5,7 +5,7 @@ import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"log"
+	"BookingGo/pkg/logger"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -54,12 +54,12 @@ func (a *AuthUseCase) Login(email string, password string) (string, error) {
 	}
 	outboxEvent, err := entity.NewOutboxEvent(enum.AuthType, payload)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка при создании outboxEvent тип %v, ошибка: %v", enum.AuthType, err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to create outboxEvent", "eventType", enum.AuthType, "error", err.Error())
 	}
 
 	err = a.outboxRepo.CreateEvent(outboxEvent)
 	if err != nil {
-		log.Printf("[Outbox] Ошибка записи outboxEvent тип %v, ошибка: %v", enum.AuthType, err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.AuthType, "error", err.Error())
 	}
 
 	return token, nil

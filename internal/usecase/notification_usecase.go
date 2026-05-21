@@ -4,8 +4,8 @@ import (
 	"BookingGo/internal/customTemplates"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"BookingGo/pkg/logger"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -93,7 +93,7 @@ func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.Us
 	case enum.CompleteBookingType:
 		return renderNotificationTemplate("booking_completed", tmplData), "Статус вашей записи был изменен"
 	default:
-		log.Printf("[Notifications] Неизвестный тип уведомления")
+		logger.Log.Error("[NotificationUseCase] Unknown notification type", "notificationType", notificationType)
 		return "Неизвестный тип уведомления", "Получено новое уведомление"
 	}
 
@@ -114,12 +114,12 @@ func renderNotificationTemplate(name string, data map[string]interface{}) string
 }
 
 func sendToEmail(email string, title string, text string) error {
-	log.Println("[EmailService] Отправили письмо с уведомлением на почту")
+	logger.Log.Info("[NotificationUseCase] Sent email")
 	return nil
 }
 
 func sendToPhone(phone string, title string, text string) error {
-	log.Println("[SmsService] Отправили смс с уведомлением на телефон")
+	logger.Log.Info("[NotificationUseCase] Sent SMS")
 	return nil
 }
 
