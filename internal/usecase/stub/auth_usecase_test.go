@@ -13,10 +13,16 @@ import (
 type StubUserUseCase struct {
 	GetUserByEmailFunc func(email string) (*entity.User, error)
 	CreateUserFunc     func(req *entity.CreateUserRequest) (*entity.User, error)
-	GetMeFunc          func(id int) (*entity.User, error)
-	UpdateMeFunc       func(id int, req *entity.UpdateUserRequest) (*entity.User, error)
+	GetUserByIDFunc    func(id int) (*entity.User, error)
+	UpdateUserFunc     func(id int, req *entity.UpdateUserRequest) (*entity.User, error)
 	ChangePasswordFunc func(id int, newPassword string) error
 	ChangeEmailFunc    func(id int, newEmail string) error
+	EmailExistsFunc    func(email string) (bool, error)
+}
+
+func (m *StubUserUseCase) UpdateUserData(id int, updates map[string]any) (*entity.User, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 type StubOutboxAuthRepository struct {
@@ -38,15 +44,15 @@ func (m *StubUserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.Use
 }
 
 func (m *StubUserUseCase) GetUserByID(id int) (*entity.User, error) {
-	if m.GetMeFunc != nil {
-		return m.GetMeFunc(id)
+	if m.GetUserByIDFunc != nil {
+		return m.GetUserByIDFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubUserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
-	if m.UpdateMeFunc != nil {
-		return m.UpdateMeFunc(id, req)
+func (m *StubUserUseCase) UpdateUserProfile(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+	if m.UpdateUserFunc != nil {
+		return m.UpdateUserFunc(id, req)
 	}
 	return nil, domain.ErrNotImplemented
 }
@@ -63,6 +69,14 @@ func (m *StubUserUseCase) ChangeEmail(id int, newEmail string) error {
 		return m.ChangeEmailFunc(id, newEmail)
 	}
 	return domain.ErrNotImplemented
+}
+
+func (m *StubUserUseCase) EmailExists(email string) (bool, error) {
+	if m.EmailExistsFunc != nil {
+		return m.EmailExistsFunc(email)
+	}
+
+	return false, domain.ErrNotImplemented
 }
 
 func (m *StubOutboxAuthRepository) CreateEvent(event *entity.OutboxEvent) error {
@@ -195,7 +209,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 
 func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -211,7 +225,7 @@ func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 
 func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -227,7 +241,7 @@ func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 
 func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		UpdateMeFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+		UpdateUserFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -245,7 +259,7 @@ func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 
 func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		UpdateMeFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+		UpdateUserFunc: func(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -263,7 +277,7 @@ func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 
 func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -282,7 +296,7 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 
 func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -301,7 +315,7 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 
 func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -320,7 +334,7 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 
 func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 		ChangePasswordFunc: func(id int, newPassword string) error {
@@ -342,7 +356,7 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 
 func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -361,8 +375,11 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 
 func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
+		},
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
 		},
 	}
 
@@ -378,13 +395,38 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 	}
 }
 
+func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+		EmailExistsFunc: func(email string) (bool, error) {
+			return true, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxAuthRepository{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier)
+	err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		ConfirmPassword: "password123",
+		NewEmail:        "newemail@example.com",
+	})
+
+	if !errors.Is(err, domain.ErrEmailTaken) {
+		t.Errorf("Ожидалась ошибка ErrEmailTaken, получена: %v", err)
+	}
+}
+
 func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetMeFunc: func(id int) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 		ChangeEmailFunc: func(id int, newEmail string) error {
 			return nil
+		},
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
 		},
 	}
 

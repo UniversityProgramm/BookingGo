@@ -20,4 +20,8 @@ var (
 	ErrNotificationsAlreadyRead  = errors.New("all notifications is already read")
 	ErrBookingAlreadyActive      = errors.New("booking is active right now")
 	ErrOnlyForStaffOrAdmin       = errors.New("only for staff or admin")
+	ErrTotpAlreadyEnabled        = errors.New("totp already enabled")
+	ErrTotpSecretNotSet          = errors.New("totp secret not set")
+	ErrInvalidTotpCode           = errors.New("invalid otp secret")
+	ErrTotpAlreadyDisabled       = errors.New("totp already disabled")
 )

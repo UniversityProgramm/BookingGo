@@ -71,7 +71,7 @@ func (u *UserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 	return user, nil
 }
 
-func (u *UserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+func (u *UserUseCase) UpdateUserProfile(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
 	_, err := u.userRepo.GetByID(id)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
@@ -88,25 +88,24 @@ func (u *UserUseCase) UpdateUser(id int, req *entity.UpdateUserRequest) (*entity
 	return u.userRepo.Update(id, updates)
 }
 
+func (u *UserUseCase) UpdateUserData(id int, updates map[string]any) (*entity.User, error) {
+	_, err := u.userRepo.GetByID(id)
+	if err != nil {
+		return nil, domain.ErrUserNotFound
+	}
+
+	return u.userRepo.Update(id, updates)
+}
+
 func (u *UserUseCase) DeleteUser(id int) error {
 	return u.userRepo.Delete(id)
 }
 
-func (u *UserUseCase) ChangePassword(id int, newPassword string) error {
-	_, err := u.userRepo.GetByID(id)
-	if err != nil {
-		return domain.ErrUserNotFound
-	}
-
-	updates := map[string]any{
-		"password_hash": string(newPassword),
-	}
-
-	_, err = u.userRepo.Update(id, updates)
-	return err
+func (u *UserUseCase) EmailExists(email string) (bool, error) {
+	return u.userRepo.EmailExists(email)
 }
 
-func (u *UserUseCase) ChangeEmail(id int, newEmail string) error {
+func (u *UserUseCase) EnableTotp(id int, newEmail string) error {
 	_, err := u.userRepo.GetByID(id)
 	if err != nil {
 		return domain.ErrUserNotFound

@@ -115,7 +115,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	updatedUser, err := u.userUseCase.UpdateUser(userId, &updateRequest)
+	updatedUser, err := u.userUseCase.UpdateUserProfile(userId, &updateRequest)
 	if err != nil {
 		if errors.Is(err, domain.ErrEmailTaken) {
 			c.JSON(http.StatusBadRequest, gin.H{

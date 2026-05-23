@@ -3,6 +3,7 @@ package app
 import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/repository"
+	"BookingGo/internal/totp"
 	"BookingGo/internal/usecase"
 	"BookingGo/internal/worker"
 	"BookingGo/pkg/db"
@@ -25,11 +26,12 @@ func Run(router *gin.Engine) {
 	bookingRepo := repository.NewBookingRepository(db.DB)
 	notificationRepo := repository.NewNotificationRepository(db.DB)
 	outboxRepo := repository.NewOutboxRepository(db.DB)
-	logger.Log.Info("[app] All repositories initialized")
+	totpService := totp.NewTotpService("Booking OTP")
+	logger.Log.Info("[app] All repositories and services initialized")
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo)
-	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo)
+	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService)
 	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, outboxRepo)
 	logger.Log.Info("[app] All usecases initialized")
 

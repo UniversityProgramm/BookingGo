@@ -49,12 +49,13 @@ func (ac *AuthController) Register(c *gin.Context) {
 	var req entity.CreateUserRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
+		return
 	}
 
 	token, err := ac.authUseCase.Register(&req)
 	if err != nil {
 		if errors.Is(err, domain.ErrEmailTaken) {
-			c.JSON(http.StatusOK, gin.H{"error": "Этот Email занят"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Этот Email занят"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка регистрации"})
 		}
@@ -101,7 +102,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		} else if errors.Is(err, domain.ErrEmailTaken) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Email уже занят"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Email уже занят"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления данных профиля"})
 		}
@@ -156,17 +157,108 @@ func (ac *AuthController) ChangeEmail(c *gin.Context) {
 		return
 	}
 
-	err := ac.authUseCase.ChangeEmail(userID, &req)
+	user, err := ac.authUseCase.ChangeEmail(userID, &req)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		} else if errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
+		} else if errors.Is(err, domain.ErrEmailTaken) {
+			c.JSON(http.StatusConflict, gin.H{"error": "Данная почта уже занята"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены почты"})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Почта успешно изменена"})
+	c.JSON(http.StatusOK, gin.H{"message": "Почта успешно изменена", "user": user})
+}
+
+func (ac *AuthController) SetupTotp(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	otpUrl, err := ac.authUseCase.SetupTotp(currentUser.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		} else if errors.Is(err, domain.ErrTotpAlreadyEnabled) {
+			c.JSON(http.StatusConflict, gin.H{"error": "2FA уже включен"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка настройки 2FA"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"manual_entry_key": otpUrl})
+}
+
+func (ac *AuthController) VerifyTotp(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	var req entity.VerifyTotpRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
+		return
+	}
+
+	err := ac.authUseCase.VerifyTotp(currentUser.UserID, &req)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		} else if errors.Is(err, domain.ErrTotpAlreadyEnabled) {
+			c.JSON(http.StatusConflict, gin.H{"error": "2FA уже подтвержден и включен"})
+		} else if errors.Is(err, domain.ErrTotpSecretNotSet) {
+			c.JSON(http.StatusPreconditionRequired, gin.H{"error": "Сначала настройте 2FA"})
+		} else if errors.Is(err, domain.ErrInvalidTotpCode) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный код"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка подтверждения 2FA"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "2FA подтвержден и включен"})
+}
+
+func (ac *AuthController) DisableTotp(c *gin.Context) {
+	currentUser := middleware.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	var req entity.DisableTotpRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
+		return
+	}
+
+	err := ac.authUseCase.DisableTotp(currentUser.UserID, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrUserNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		case errors.Is(err, domain.ErrTotpAlreadyDisabled):
+			c.JSON(http.StatusConflict, gin.H{"error": "2FA уже выключен"})
+		case errors.Is(err, domain.ErrTotpSecretNotSet):
+			c.JSON(http.StatusPreconditionRequired, gin.H{"error": "Сначала настройте 2FA"})
+		case errors.Is(err, domain.ErrInvalidTotpCode):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный код"})
+		case errors.Is(err, domain.ErrCurPasswordIsNotCorrect):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка отключения 2FA"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "2FA выключен"})
 }

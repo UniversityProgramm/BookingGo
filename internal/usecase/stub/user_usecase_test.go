@@ -216,7 +216,7 @@ func TestUserUseCase_UpdateUser_UserNotFound(t *testing.T) {
 		Phone: new("123123123"),
 	}
 
-	_, err := useCase.UpdateUser(1, req)
+	_, err := useCase.UpdateUserProfile(1, req)
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 		Phone: &updatedPhone,
 	}
 
-	_, err := useCase.UpdateUser(1, req)
+	_, err := useCase.UpdateUserProfile(1, req)
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}

@@ -89,7 +89,7 @@ func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.Us
 	case enum.CancelBookingType:
 		return renderNotificationTemplate("booking_canceled", tmplData), "Вы отменили запись"
 	case enum.AuthType:
-		return renderNotificationTemplate("booking_auth", tmplData), "Вы вошли в аккаунт"
+		return renderNotificationTemplate("auth", tmplData), "Вы вошли в аккаунт"
 	case enum.CompleteBookingType:
 		return renderNotificationTemplate("booking_completed", tmplData), "Статус вашей записи был изменен"
 	default:
