@@ -104,17 +104,3 @@ func (u *UserUseCase) DeleteUser(id int) error {
 func (u *UserUseCase) EmailExists(email string) (bool, error) {
 	return u.userRepo.EmailExists(email)
 }
-
-func (u *UserUseCase) EnableTotp(id int, newEmail string) error {
-	_, err := u.userRepo.GetByID(id)
-	if err != nil {
-		return domain.ErrUserNotFound
-	}
-
-	updates := map[string]any{
-		"email": newEmail,
-	}
-
-	_, err = u.userRepo.Update(id, updates)
-	return err
-}

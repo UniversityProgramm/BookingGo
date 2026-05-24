@@ -8,8 +8,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type StubUserRepository struct {
@@ -289,38 +287,104 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_ChangePassword_UserNotFound(t *testing.T) {
+func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
-	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
 
-	err = useCase.ChangePassword(1, string(newPassword))
+	updates := map[string]any{"fio": "New Name"}
+	_, err := useCase.UpdateUserData(999, updates)
+
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
 }
 
-func TestUserUseCase_ChangePassword_Success(t *testing.T) {
+func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testUser, nil
 		},
+		UpdateFunc: func(id int, updates map[string]any) (*entity.User, error) {
+			// Проверяем, что переданы правильные данные
+			if fio, ok := updates["fio"]; ok {
+				if fio != "Updated FIO" {
+					t.Errorf("Неверное значение FIO: %v", fio)
+				}
+			}
+			// Возвращаем обновлённого пользователя
+			updated := *testUser
+			updated.FIO = "Updated FIO"
+			return &updated, nil
+		},
 	}
+
 	useCase := usecase.NewUserUseCase(stubRepo)
-	newPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
+	updates := map[string]any{"fio": "Updated FIO"}
+
+	result, err := useCase.UpdateUserData(1, updates)
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
+	if result.FIO != "Updated FIO" {
+		t.Errorf("FIO не обновлён: %s", result.FIO)
+	}
+}
 
-	err = useCase.ChangePassword(1, string(newPassword))
-	if errors.Is(err, domain.ErrUserNotFound) {
+func TestUserUseCase_EmailExists_True(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		EmailExistsFunc: func(email string) (bool, error) {
+			if email == "taken@example.com" {
+				return true, nil
+			}
+			return false, nil
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	exists, err := useCase.EmailExists("taken@example.com")
+	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if !exists {
+		t.Error("Ожидалось, что email занят")
+	}
+}
+
+func TestUserUseCase_EmailExists_False(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	exists, err := useCase.EmailExists("free@example.com")
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if exists {
+		t.Error("Ожидалось, что email свободен")
+	}
+}
+
+func TestUserUseCase_EmailExists_Error(t *testing.T) {
+	dbErr := errors.New("database error")
+	stubRepo := &StubUserRepository{
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, dbErr
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.EmailExists("test@example.com")
+	if err == nil {
+		t.Fatal("Ожидалась ошибка БД, получена nil")
+	}
+	if err != dbErr {
+		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
 	}
 }
