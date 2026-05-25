@@ -92,6 +92,10 @@ func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.Us
 		return renderNotificationTemplate("auth", tmplData), "Вы вошли в аккаунт"
 	case enum.CompleteBookingType:
 		return renderNotificationTemplate("booking_completed", tmplData), "Статус вашей записи был изменен"
+	case enum.ChangeEmailType:
+		return renderNotificationTemplate("change_email", tmplData), "Вы сменили email"
+	case enum.ChangePasswordType:
+		return renderNotificationTemplate("change_password", tmplData), "Вы сменили пароль"
 	default:
 		logger.Log.Error("[NotificationUseCase] Unknown notification type", "notificationType", notificationType)
 		return "Неизвестный тип уведомления", "Получено новое уведомление"

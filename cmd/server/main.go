@@ -3,6 +3,7 @@ package main
 import (
 	"BookingGo/internal/app"
 	"BookingGo/pkg/logger"
+	"BookingGo/pkg/natsClient"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -14,10 +15,12 @@ func main() {
 		logger.Init()
 		logger.Fatal("[main] Error loading .env file", "error", loadErr.Error())
 	}
+
 	logger.Init()
 	logger.Log.Info("[main] Starting app...", "version", "1.0.0")
 
 	logger.Log.Info("[main] Starting router...")
+
 	router := gin.Default()
 	app.Run(router)
 	logger.Log.Info("[main] Router is initialized")
@@ -26,8 +29,11 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
 	if err := router.Run(":" + port); err != nil {
 		logger.Fatal("[main] Failed to run server", "error", err.Error())
 	}
 	logger.Log.Info("[main] Server is running", "port", port)
+
+	natsClient.Close()
 }

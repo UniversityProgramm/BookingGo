@@ -8,6 +8,7 @@ import (
 	"BookingGo/internal/worker"
 	"BookingGo/pkg/db"
 	"BookingGo/pkg/logger"
+	"BookingGo/pkg/natsClient"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +39,15 @@ func Run(router *gin.Engine) {
 	outboxWorker := worker.NewOutboxWorker(outboxRepo, notificationUseCase)
 	go outboxWorker.Start()
 	logger.Log.Info("[app] Outbox worker is running")
+
+	if err := natsClient.Init(); err != nil {
+		logger.Fatal("[app] Failed to init NATS", "error", err.Error())
+	}
+
+	bookingWorker := worker.NewExternalBookingWorker(bookingUseCase, userUseCase)
+	if err := bookingWorker.Start(); err != nil {
+		logger.Fatal("[app] Failed to start booking worker", "error", err.Error())
+	}
 
 	SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
 	logger.Log.Info("[app] Router is running")

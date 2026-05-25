@@ -24,4 +24,7 @@ var (
 	ErrTotpSecretNotSet          = errors.New("totp secret not set")
 	ErrInvalidTotpCode           = errors.New("invalid otp secret")
 	ErrTotpAlreadyDisabled       = errors.New("totp already disabled")
+	ErrNatsConnection            = errors.New("natsClient connection error")
+	ErrJetStreamConnection       = errors.New("jetstream connection error")
+	ErrStreamAdd                 = errors.New("stream add error")
 )
