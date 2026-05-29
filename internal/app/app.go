@@ -2,6 +2,7 @@ package app
 
 import (
 	"BookingGo/internal/auth"
+	"BookingGo/internal/domain"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/totp"
 	"BookingGo/internal/usecase"
@@ -9,6 +10,7 @@ import (
 	"BookingGo/pkg/db"
 	"BookingGo/pkg/logger"
 	"BookingGo/pkg/natsClient"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,14 +42,32 @@ func Run(router *gin.Engine) {
 	go outboxWorker.Start()
 	logger.Log.Info("[app] Outbox worker is running")
 
-	if err := natsClient.Init(); err != nil {
-		logger.Fatal("[app] Failed to init NATS", "error", err.Error())
+	err = natsClient.Init()
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNatsConnection):
+			logger.Log.Error("[app] Failed to connect to NATS", "error", err.Error())
+		case errors.Is(err, domain.ErrJetStreamConnection):
+			logger.Log.Error("[app] Failed to initialize JetStream", "error", err.Error())
+		case errors.Is(err, domain.ErrStreamAdd):
+			logger.Log.Error("[app] Failed to create NATS stream", "stream_name", "BOOKING", "error", err.Error())
+		case errors.Is(err, domain.ErrStreamAlreadyExists):
+			logger.Log.Debug("[app] Stream already exists, skipping creation", "stream_name", "BOOKING")
+		default:
+			logger.Fatal("[app] Failed to init NATS", "error", err.Error())
+		}
 	}
+	logger.Log.Info("[app] NATS stream created successfully",
+		"stream_name", "BOOKINGS",
+		"subjects", []string{"booking.external.create"},
+		"storage", "file",
+	)
 
 	bookingWorker := worker.NewExternalBookingWorker(bookingUseCase, userUseCase)
 	if err := bookingWorker.Start(); err != nil {
-		logger.Fatal("[app] Failed to start booking worker", "error", err.Error())
+		logger.Fatal("[app] Failed to start external booking worker", "error", err.Error())
 	}
+	logger.Log.Info("[app] External booking worker is running")
 
 	SetupRoutes(router, userUseCase, authUseCase, bookingUseCase, notificationUseCase)
 	logger.Log.Info("[app] Router is running")

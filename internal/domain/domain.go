@@ -27,4 +27,5 @@ var (
 	ErrNatsConnection            = errors.New("natsClient connection error")
 	ErrJetStreamConnection       = errors.New("jetstream connection error")
 	ErrStreamAdd                 = errors.New("stream add error")
+	ErrStreamAlreadyExists       = errors.New("stream already exists")
 )

@@ -20,11 +20,7 @@ func NewAuthController(authUseCase *usecase.AuthUseCase) *AuthController {
 }
 
 func (ac *AuthController) Login(c *gin.Context) {
-	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=8,max=20"`
-	}
-
+	var req *entity.LoginUserRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -32,11 +28,12 @@ func (ac *AuthController) Login(c *gin.Context) {
 
 	token, err := ac.authUseCase.Login(req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidEmail) {
+		switch {
+		case errors.Is(err, domain.ErrInvalidEmail):
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email"})
-		} else if errors.Is(err, domain.ErrInvalidPassword) {
+		case errors.Is(err, domain.ErrInvalidPassword):
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный пароль"})
-		} else {
+		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка входа"})
 		}
 		return

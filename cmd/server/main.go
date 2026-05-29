@@ -36,4 +36,5 @@ func main() {
 	logger.Log.Info("[main] Server is running", "port", port)
 
 	natsClient.Close()
+	logger.Log.Info("[NATS] NATS connection closed")
 }

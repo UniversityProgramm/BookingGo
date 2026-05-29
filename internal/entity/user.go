@@ -27,6 +27,11 @@ type CreateUserRequest struct {
 	Phone    string `json:"phone" binding:"required,min=10,max=15"`
 }
 
+type LoginUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=20"`
+}
+
 type UpdateUserRequest struct {
 	FIO   *string `json:"fio"`
 	Phone *string `json:"phone,min=10,max=15"`
