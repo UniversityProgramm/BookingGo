@@ -1,1 +1,8 @@
 .env
+docker-compose.yml
+.idea
+*.log
+.vscode
+tmp/
+bin/
+.env.docker

@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    container_name: booking_app
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.docker
+    depends_on:
+      db:
+        condition: service_healthy  # Ждем, пока БД не пройдет чек на работоспособность
+      nats:
+        condition: service_started
+    networks:
+      - booking-network
+
+  db:
+    image: postgres:18-alpine
+    container_name: booking_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: booking_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql  # Сохраняем данные в томе
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d booking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - booking-network
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: booking_nats
+    restart: always
+    ports:
+      - "4222:4222"
+    command: [ "-js" ]  # включить JetStream
+    networks:
+      - booking-network
+
+volumes:
+  pg_data:
+
+networks:
+  booking-network:
+    driver: bridge
