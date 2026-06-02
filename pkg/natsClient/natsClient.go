@@ -23,12 +23,32 @@ func Init() error {
 	}
 
 	var err error
-	Connection, err = nats.Connect(url, nats.RetryOnFailedConnect(true), nats.Timeout(10*time.Second))
+	Connection, err = nats.Connect(url,
+		nats.RetryOnFailedConnect(true),
+		nats.Timeout(10*time.Second),
+		nats.ReconnectWait(2*time.Second),
+		nats.MaxReconnects(100),
+
+		nats.ReconnectBufSize(1024*1024), // 1 MB
+
+		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+			logger.Log.Error("[NATS] Disconnected", "error", err)
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			logger.Log.Info("[NATS] Reconnected", "url", nc.ConnectedUrl())
+		}),
+		nats.ClosedHandler(func(nc *nats.Conn) {
+			logger.Log.Info("[NATS] Connection closed")
+		}),
+		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
+			logger.Log.Error("[NATS] Async error", "error", err, "subject", sub.Subject)
+		}),
+	)
 	if err != nil {
 		return domain.ErrNatsConnection
 	}
 
-	JS, err = Connection.JetStream()
+	JS, err = Connection.JetStream(nats.MaxWait(10 * time.Second))
 	if err != nil {
 		return domain.ErrJetStreamConnection
 	}
