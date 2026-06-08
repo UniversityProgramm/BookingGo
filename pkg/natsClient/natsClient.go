@@ -31,9 +31,6 @@ func Init() error {
 
 		nats.ReconnectBufSize(1024*1024), // 1 MB
 
-		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-			logger.Log.Error("[NATS] Disconnected", "error", err)
-		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
 			logger.Log.Info("[NATS] Reconnected", "url", nc.ConnectedUrl())
 		}),

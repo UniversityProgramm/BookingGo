@@ -3,6 +3,7 @@ package repository
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
+	"context"
 	"errors"
 
 	"gorm.io/gorm"
@@ -23,8 +24,12 @@ func (r *UserRepository) GetAll() ([]entity.User, error) {
 }
 
 func (r *UserRepository) GetByID(id int) (*entity.User, error) {
+	return r.GetByIDContext(context.Background(), id)
+}
+
+func (r *UserRepository) GetByIDContext(ctx context.Context, id int) (*entity.User, error) {
 	var user entity.User
-	result := r.db.First(&user, id)
+	result := r.db.WithContext(ctx).First(&user, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -36,8 +41,12 @@ func (r *UserRepository) GetByID(id int) (*entity.User, error) {
 }
 
 func (r *UserRepository) GetByEmail(email string) (*entity.User, error) {
+	return r.GetByEmailContext(context.Background(), email)
+}
+
+func (r *UserRepository) GetByEmailContext(ctx context.Context, email string) (*entity.User, error) {
 	var user entity.User
-	result := r.db.Where("email = ?", email).First(&user)
+	result := r.db.WithContext(ctx).Where("email = ?", email).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}

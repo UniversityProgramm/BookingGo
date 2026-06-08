@@ -3,6 +3,7 @@ package repository
 import (
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -17,19 +18,23 @@ func NewOutboxRepository(DB *gorm.DB) *OutboxRepository {
 }
 
 func (r *OutboxRepository) CreateEvent(event *entity.OutboxEvent) error {
-	return r.db.Create(event).Error
+	return r.CreateEventContext(context.Background(), event)
 }
 
-func (r *OutboxRepository) GetPendingEvents(limit int) ([]entity.OutboxEvent, error) {
+func (r *OutboxRepository) CreateEventContext(ctx context.Context, event *entity.OutboxEvent) error {
+	return r.db.WithContext(ctx).Create(event).Error
+}
+
+func (r *OutboxRepository) GetPendingEvents(ctx context.Context, limit int) ([]entity.OutboxEvent, error) {
 	var events []entity.OutboxEvent
-	err := r.db.Where("status = ? AND retry_count < ?", enum.StatusPending, 3).
+	err := r.db.WithContext(ctx).Where("status = ? AND retry_count < ?", enum.StatusPending, 3).
 		Order("created_at ASC").
 		Limit(limit).Find(&events).Error
 	return events, err
 }
 
-func (r *OutboxRepository) MarkEventAsSent(id int) error {
-	return r.db.Model(&entity.OutboxEvent{}).
+func (r *OutboxRepository) MarkEventAsSent(ctx context.Context, id int) error {
+	return r.db.WithContext(ctx).Model(&entity.OutboxEvent{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"status":     enum.StatusSent,
@@ -37,8 +42,8 @@ func (r *OutboxRepository) MarkEventAsSent(id int) error {
 		}).Error
 }
 
-func (r *OutboxRepository) MarkEventAsFailed(id int) error {
-	return r.db.Model(&entity.OutboxEvent{}).
+func (r *OutboxRepository) MarkEventAsFailed(ctx context.Context, id int) error {
+	return r.db.WithContext(ctx).Model(&entity.OutboxEvent{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"status":      enum.StatusFailed,

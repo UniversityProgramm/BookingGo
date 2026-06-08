@@ -3,16 +3,15 @@ package app
 import (
 	"BookingGo/internal/controller"
 	"BookingGo/internal/middleware"
-	"BookingGo/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Обрабатывает пути эндпоинтов
-func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *usecase.AuthUseCase, bookingUseCase *usecase.BookingUseCase, notificationUseCase *usecase.NotificationUseCase) {
+func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	api := r.Group("/api")
 
-	authController := controller.NewAuthController(authUseCase)
+	authController := controller.NewAuthController(deps.AuthUseCase)
 	authGroup := api.Group("/auth")
 	{
 		authGroup.POST("/login", authController.Login)
@@ -37,7 +36,7 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		}
 	}
 
-	bookingController := controller.NewBookingController(bookingUseCase)
+	bookingController := controller.NewBookingController(deps.BookingUseCase)
 	bookingGroup := protectedGroup.Group("/bookings")
 	{
 		bookingGroup.GET("", bookingController.GetMyBookings)
@@ -45,14 +44,14 @@ func SetupRoutes(r *gin.Engine, userUseCase *usecase.UserUseCase, authUseCase *u
 		bookingGroup.POST("/cancelBooking/:id", bookingController.CancelMyBooking)
 	}
 
-	notificationController := controller.NewNotificationController(notificationUseCase)
+	notificationController := controller.NewNotificationController(deps.NotificationUseCase)
 	notificationGroup := protectedGroup.Group("/notifications")
 	{
 		notificationGroup.GET("", notificationController.GetMyNotifications)
 		notificationGroup.PATCH("/settings", notificationController.UpdateNotificationSettings)
 	}
 
-	userController := controller.NewUserController(userUseCase)
+	userController := controller.NewUserController(deps.UserUseCase)
 	staffGroup := api.Group("/staffPanel")
 	staffGroup.Use(middleware.AuthMiddleware())
 	staffGroup.Use(middleware.StaffOnly())

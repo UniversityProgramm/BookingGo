@@ -4,6 +4,7 @@ import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"context"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,6 +17,8 @@ type UserRepository interface {
 	Update(id int, requestUser map[string]any) (*entity.User, error)
 	Delete(id int) error
 	EmailExists(email string) (bool, error)
+	GetByEmailContext(ctx context.Context, email string) (*entity.User, error)
+	GetByIDContext(ctx context.Context, id int) (*entity.User, error)
 }
 
 type UserUseCase struct {
@@ -36,6 +39,10 @@ func (u *UserUseCase) GetUserByID(id int) (*entity.User, error) {
 
 func (u *UserUseCase) GetUserByEmail(email string) (*entity.User, error) {
 	return u.userRepo.GetByEmail(email)
+}
+
+func (u *UserUseCase) GetUserByEmailContext(ctx context.Context, email string) (*entity.User, error) {
+	return u.userRepo.GetByEmailContext(ctx, email)
 }
 
 func (u *UserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {

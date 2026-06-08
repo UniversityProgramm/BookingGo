@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -19,6 +21,11 @@ import (
 type ExternalBookingWorker struct {
 	bookingUseCase *usecase.BookingUseCase
 	userUseCase    *usecase.UserUseCase
+
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	running atomic.Bool
 }
 
 func NewExternalBookingWorker(bookingUseCase *usecase.BookingUseCase, userUseCase *usecase.UserUseCase) *ExternalBookingWorker {
@@ -27,9 +34,25 @@ func NewExternalBookingWorker(bookingUseCase *usecase.BookingUseCase, userUseCas
 		userUseCase:    userUseCase,
 	}
 }
-func (w *ExternalBookingWorker) Start() error {
-	logger.Log.Info("[ExternalBookingWorker] Starting external booking worker")
 
+func (w *ExternalBookingWorker) Start() error {
+	if !w.running.CompareAndSwap(false, true) {
+		return fmt.Errorf("ExternalBookingWorker is already running")
+	}
+
+	w.ctx, w.cancel = context.WithCancel(context.Background())
+
+	err := w.Run()
+	if err != nil {
+		w.running.Store(false)
+		return err
+	}
+
+	logger.Log.Info("[ExternalBookingWorker] Started")
+	return nil
+}
+
+func (w *ExternalBookingWorker) Run() error {
 	sub, err := natsClient.JS.PullSubscribe(
 		"booking.external.create",    // куда приходят сообщения
 		"booking-consumer",           // имя потребителя
@@ -40,28 +63,44 @@ func (w *ExternalBookingWorker) Start() error {
 		return fmt.Errorf("subscribe: %w", err)
 	}
 
+	w.wg.Add(1)
 	go func() {
+		defer w.wg.Done()
 		defer logger.Log.Info("[ExternalBookingWorker] Worker stopped")
 
 		for {
+			if w.ctx.Err() != nil {
+				return
+			}
+
 			msgs, err := sub.Fetch(1, nats.MaxWait(2*time.Second))
 			if err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
 				if errors.Is(err, nats.ErrTimeout) {
 					continue
 				}
-
 				if errors.Is(err, nats.ErrConnectionClosed) ||
 					errors.Is(err, nats.ErrBadSubscription) {
 					logger.Log.Warn("[ExternalBookingWorker] Subscription/connection closed, stopping worker")
-					return // ← КРИТИЧНО: прекращаем цикл
+					return
 				}
 
 				logger.Log.Error("[ExternalBookingWorker] Fetch error, retrying in 5s", "error", err.Error())
-				time.Sleep(5 * time.Second)
-				continue
+
+				select {
+				case <-w.ctx.Done():
+					return
+				case <-time.After(5 * time.Second):
+					continue
+				}
 			}
 
 			for _, msg := range msgs {
+				if w.ctx.Err() != nil {
+					return
+				}
 				w.processMessage(msg)
 			}
 		}
@@ -85,8 +124,11 @@ func (w *ExternalBookingWorker) processMessage(msg *nats.Msg) {
 		"slot_start", req.SlotStart,
 	)
 
-	user, err := w.userUseCase.GetUserByEmail(req.UserEmail)
+	user, err := w.userUseCase.GetUserByEmailContext(w.ctx, req.UserEmail)
 	if err != nil {
+		if w.ctx.Err() != nil {
+			return
+		}
 		logger.Log.Error("[ExternalBookingWorker] User not found for external booking",
 			"email", req.UserEmail,
 			"external_id", req.ExternalID,
@@ -102,8 +144,12 @@ func (w *ExternalBookingWorker) processMessage(msg *nats.Msg) {
 		ProblemDescription: req.ProblemDescription,
 	}
 
-	_, err = w.bookingUseCase.CreateBooking(user.ID, createReq)
+	_, err = w.bookingUseCase.CreateBooking(w.ctx, user.ID, createReq)
 	if err != nil {
+		if w.ctx.Err() != nil {
+			return
+		}
+
 		// Если ошибка временная
 		if isRetryable(err) {
 			logger.Log.Warn("[ExternalBookingWorker] Temporary error, will retry",
@@ -153,5 +199,25 @@ func (w *ExternalBookingWorker) safeNak(msg *nats.Msg, externalID string) {
 			"external_id", externalID,
 			"error", err.Error(),
 		)
+	}
+}
+
+func (w *ExternalBookingWorker) Stop() {
+	if !w.running.CompareAndSwap(true, false) {
+		return
+	}
+
+	w.cancel()
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logger.Log.Info("[ExternalBookingWorker] Stopped")
+	case <-time.After(10 * time.Second):
+		logger.Log.Warn("[ExternalBookingWorker] Stop timeout, forcing shutdown")
 	}
 }

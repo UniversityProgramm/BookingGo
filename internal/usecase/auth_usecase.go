@@ -19,10 +19,6 @@ type UserUseCaseInterface interface {
 	EmailExists(email string) (bool, error)
 }
 
-type OutboxAuthRepository interface {
-	CreateEvent(event *entity.OutboxEvent) error
-}
-
 type TotpService interface {
 	GenerateSecret(email string) (string, string, error)
 	ValidateCode(secret, code string) bool
@@ -30,11 +26,11 @@ type TotpService interface {
 
 type AuthUseCase struct {
 	userUseCase UserUseCaseInterface
-	outboxRepo  OutboxAuthRepository
+	outboxRepo  OutboxRepository
 	totpService TotpService
 }
 
-func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxAuthRepository, totpService TotpService) *AuthUseCase {
+func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService) *AuthUseCase {
 	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService}
 }
 

@@ -4,6 +4,7 @@ import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
+	"context"
 	"errors"
 	"time"
 
@@ -18,13 +19,13 @@ func NewBookingRepository(DB *gorm.DB) *BookingRepository {
 	return &BookingRepository{db: DB}
 }
 
-func (r *BookingRepository) Create(booking *entity.Booking) error {
-	return r.db.Create(booking).Error
+func (r *BookingRepository) Create(ctx context.Context, booking *entity.Booking) error {
+	return r.db.WithContext(ctx).Create(booking).Error
 }
 
-func (r *BookingRepository) IsSlotAvailable(start, end time.Time) (bool, error) {
+func (r *BookingRepository) IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error) {
 	var count int64
-	err := r.db.Model(&entity.Booking{}).
+	err := r.db.WithContext(ctx).Model(&entity.Booking{}).
 		Where("slot_start < ? AND ? < slot_end", end, start).
 		Count(&count).Error
 	if err != nil {

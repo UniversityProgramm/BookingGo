@@ -33,7 +33,8 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		return
 	}
 
-	booking, err := bc.bookingUseCase.CreateBooking(currentUser.UserID, &req)
+	ctx := c.Request.Context()
+	booking, err := bc.bookingUseCase.CreateBooking(ctx, currentUser.UserID, &req)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidTimeRange) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Недействительное время записи"})

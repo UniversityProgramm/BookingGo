@@ -6,7 +6,11 @@ import (
 	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
 	"BookingGo/pkg/logger"
+	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -14,6 +18,11 @@ type OutboxWorker struct {
 	outboxRepo   *repository.OutboxRepository
 	notifUseCase *usecase.NotificationUseCase
 	interval     time.Duration
+
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	running atomic.Bool
 }
 
 func NewOutboxWorker(outboxRepo *repository.OutboxRepository, notifUseCase *usecase.NotificationUseCase) *OutboxWorker {
@@ -24,30 +33,59 @@ func NewOutboxWorker(outboxRepo *repository.OutboxRepository, notifUseCase *usec
 	}
 }
 
-func (w *OutboxWorker) Start() {
-	logger.Log.Info("[OutboxWorker] Starting outbox worker")
+func (w *OutboxWorker) Start() error {
+	if !w.running.CompareAndSwap(false, true) {
+		return fmt.Errorf("OutboxWorker is already running")
+	}
+
+	w.ctx, w.cancel = context.WithCancel(context.Background())
+	w.wg.Add(1)
+
+	go w.Run()
+
+	logger.Log.Info("[OutboxWorker] Started")
+	return nil
+}
+
+func (w *OutboxWorker) Run() {
+	defer w.wg.Done()
+
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
-	for range ticker.C {
-		w.processBatch()
+
+	for {
+		select {
+		case <-w.ctx.Done():
+			logger.Log.Info("[OutboxWorker] Stopping...")
+			return
+		case <-ticker.C:
+			w.processBatch()
+		}
 	}
 }
 
 func (w *OutboxWorker) processBatch() {
-	events, err := w.outboxRepo.GetPendingEvents(50)
+	events, err := w.outboxRepo.GetPendingEvents(w.ctx, 50)
 	if err != nil {
+		if w.ctx.Err() != nil {
+			return
+		}
 		logger.Log.Error("[OutboxWorker] Failed to get pending events", "error", err.Error())
 		return
 	}
 
 	for _, event := range events {
+		if w.ctx.Err() != nil {
+			return
+		}
+
 		if err := w.processEvent(event); err != nil {
-			logger.Log.Error("[OutboxWorker] Failed to process event", "eventID", event.ID, "error", err.Error())
-			if err := w.outboxRepo.MarkEventAsFailed(event.ID); err != nil {
+			logger.Log.Warn("[OutboxWorker] Failed to process event", "eventID", event.ID, "error", err.Error())
+			if err := w.outboxRepo.MarkEventAsFailed(w.ctx, event.ID); err != nil {
 				logger.Log.Error("[OutboxWorker] Failed to mark event as failed", "eventID", event.ID, "error", err.Error())
 			}
 		} else {
-			if err := w.outboxRepo.MarkEventAsSent(event.ID); err != nil {
+			if err := w.outboxRepo.MarkEventAsSent(w.ctx, event.ID); err != nil {
 				logger.Log.Error("[OutboxWorker] Failed to mark event as sent", "eventID", event.ID, "error", err.Error())
 			}
 		}
@@ -75,4 +113,24 @@ func (w *OutboxWorker) processEvent(event entity.OutboxEvent) error {
 	}
 
 	return w.notifUseCase.CreateNotification(userID, eventType, params)
+}
+
+func (w *OutboxWorker) Stop() {
+	if !w.running.CompareAndSwap(true, false) {
+		return
+	}
+
+	w.cancel()
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logger.Log.Info("[OutboxWorker] Stopped")
+	case <-time.After(10 * time.Second):
+		logger.Log.Warn("[OutboxWorker] Stop timeout, forcing shutdown")
+	}
 }

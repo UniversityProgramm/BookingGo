@@ -5,12 +5,13 @@ import (
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
+	"context"
 	"time"
 )
 
 type BookingRepository interface {
-	Create(booking *entity.Booking) error
-	IsSlotAvailable(start, end time.Time) (bool, error)
+	Create(ctx context.Context, booking *entity.Booking) error
+	IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error)
 	GetAllBookingsByUserID(id int) ([]entity.Booking, error)
 	GetBookingByID(id int) (*entity.Booking, error)
 	SetBookingComplete(bookingID int) (*entity.Booking, error)
@@ -18,22 +19,23 @@ type BookingRepository interface {
 	GetAll() ([]entity.Booking, error)
 }
 
-type OutboxBookingRepository interface {
+type OutboxRepository interface {
 	CreateEvent(event *entity.OutboxEvent) error
+	CreateEventContext(ctx context.Context, event *entity.OutboxEvent) error
 }
 
 type BookingUseCase struct {
 	bookingRepo BookingRepository
 	userRepo    UserRepository
-	outboxRepo  OutboxBookingRepository
+	outboxRepo  OutboxRepository
 }
 
-func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, outboxRepo OutboxBookingRepository) *BookingUseCase {
+func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, outboxRepo OutboxRepository) *BookingUseCase {
 	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo, outboxRepo: outboxRepo}
 }
 
-func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
-	user, err := b.userRepo.GetByID(id)
+func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
+	user, err := b.userRepo.GetByIDContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +47,7 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 
 	slotEnd := req.SlotStart.Add(1 * time.Hour)
 
-	available, err := b.bookingRepo.IsSlotAvailable(req.SlotStart, slotEnd)
+	available, err := b.bookingRepo.IsSlotAvailable(ctx, req.SlotStart, slotEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +63,7 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 		ProblemDescription: req.ProblemDescription,
 	}
 
-	err = b.bookingRepo.Create(booking)
+	err = b.bookingRepo.Create(ctx, booking)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +77,7 @@ func (b *BookingUseCase) CreateBooking(id int, req *entity.CreateBookingRequest)
 		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 	}
 
-	err = b.outboxRepo.CreateEvent(outboxEvent)
+	err = b.outboxRepo.CreateEventContext(ctx, outboxEvent)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 	}
