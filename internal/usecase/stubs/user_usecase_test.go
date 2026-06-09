@@ -1,23 +1,26 @@
-package stub
+package stubs
 
 import (
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
+	"context"
 	"errors"
 	"testing"
 	"time"
 )
 
 type StubUserRepository struct {
-	GetAllFunc      func() ([]entity.User, error)
-	GetByIDFunc     func(id int) (*entity.User, error)
-	GetByEmailFunc  func(email string) (*entity.User, error)
-	CreateFunc      func(user *entity.User) error
-	UpdateFunc      func(id int, requestUser map[string]interface{}) (*entity.User, error)
-	DeleteFunc      func(id int) error
-	EmailExistsFunc func(email string) (bool, error)
+	GetAllFunc            func() ([]entity.User, error)
+	GetByIDFunc           func(id int) (*entity.User, error)
+	GetByEmailFunc        func(email string) (*entity.User, error)
+	CreateFunc            func(user *entity.User) error
+	UpdateFunc            func(id int, requestUser map[string]interface{}) (*entity.User, error)
+	DeleteFunc            func(id int) error
+	EmailExistsFunc       func(email string) (bool, error)
+	GetByEmailContextFunc func(ctx context.Context, email string) (*entity.User, error)
+	GetByIDContextFunc    func(ctx context.Context, id int) (*entity.User, error)
 }
 
 func (m *StubUserRepository) GetAll() ([]entity.User, error) {
@@ -67,6 +70,20 @@ func (m *StubUserRepository) EmailExists(email string) (bool, error) {
 		return m.EmailExistsFunc(email)
 	}
 	return false, domain.ErrNotImplemented
+}
+
+func (m *StubUserRepository) GetByIDContext(ctx context.Context, id int) (*entity.User, error) {
+	if m.GetByIDContextFunc != nil {
+		return m.GetByIDContextFunc(ctx, id)
+	}
+	return nil, domain.ErrNotImplemented
+}
+
+func (m *StubUserRepository) GetByEmailContext(ctx context.Context, email string) (*entity.User, error) {
+	if m.GetByEmailContextFunc != nil {
+		return m.GetByEmailContextFunc(ctx, email)
+	}
+	return nil, domain.ErrNotImplemented
 }
 
 // Тесты
@@ -202,14 +219,14 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_UpdateUser_UserNotFound(t *testing.T) {
+func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
-	req := &entity.UpdateUserRequest{
+	req := &entity.UpdateUserProfileRequest{
 		FIO:   new("new test fio"),
 		Phone: new("123123123"),
 	}
@@ -220,7 +237,7 @@ func TestUserUseCase_UpdateUser_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_UpdateUser_Success(t *testing.T) {
+func TestUserUseCase_UpdateUserProfile_Success(t *testing.T) {
 	updatedFIO := "Updated Name"
 	updatedPhone := "+79999999999"
 
@@ -239,7 +256,6 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 					t.Errorf("Неверное значение Phone: %v", phone)
 				}
 			}
-			// Возвращаем обновлённого пользователя
 			updatedUser := *testUser
 			updatedUser.FIO = updatedFIO
 			updatedUser.Phone = updatedPhone
@@ -248,7 +264,7 @@ func TestUserUseCase_UpdateUser_Success(t *testing.T) {
 	}
 
 	useCase := usecase.NewUserUseCase(stubRepo)
-	req := &entity.UpdateUserRequest{
+	req := &entity.UpdateUserProfileRequest{
 		FIO:   &updatedFIO,
 		Phone: &updatedPhone,
 	}
@@ -386,5 +402,33 @@ func TestUserUseCase_EmailExists_Error(t *testing.T) {
 	}
 	if err != dbErr {
 		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
+	}
+}
+
+func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.GetUserByEmailContext(context.Background(), "email")
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
+func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+			return testUser, nil
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.GetUserByEmailContext(context.Background(), "email@mail.ru")
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
 }

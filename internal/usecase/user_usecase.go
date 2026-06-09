@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+//go:generate mockgen -source=user_usecase.go -destination=mocks/user_mocks.go -package=mocks
 type UserRepository interface {
 	GetAll() ([]entity.User, error)
 	GetByID(id int) (*entity.User, error)
@@ -78,7 +79,7 @@ func (u *UserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, e
 	return user, nil
 }
 
-func (u *UserUseCase) UpdateUserProfile(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+func (u *UserUseCase) UpdateUserProfile(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
 	_, err := u.userRepo.GetByID(id)
 	if err != nil {
 		return nil, domain.ErrUserNotFound

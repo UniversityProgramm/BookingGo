@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=notification_usecase.go -destination=mocks/notification_mocks.go -package=mocks
 type NotificationRepository interface {
 	UpdateSettings(userID int, req *entity.NotificationSettings) error
 	GetAllNotificationsByUserID(userID int) ([]entity.Notification, error)

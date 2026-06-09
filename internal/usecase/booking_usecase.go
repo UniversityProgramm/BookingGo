@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=booking_usecase.go -destination=mocks/booking_mocks.go -package=mocks
 type BookingRepository interface {
 	Create(ctx context.Context, booking *entity.Booking) error
 	IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error)

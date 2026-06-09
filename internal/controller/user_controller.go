@@ -107,7 +107,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var updateRequest entity.UpdateUserRequest
+	var updateRequest entity.UpdateUserProfileRequest
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprint("Неверный формат данных", err.Error()),

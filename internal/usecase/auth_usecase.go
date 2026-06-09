@@ -10,11 +10,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+//go:generate mockgen -source=auth_usecase.go -destination=mocks/auth_mocks.go -package=mocks
 type UserUseCaseInterface interface {
 	GetUserByEmail(email string) (*entity.User, error)
 	CreateUser(req *entity.CreateUserRequest) (*entity.User, error)
 	GetUserByID(id int) (*entity.User, error)
-	UpdateUserProfile(id int, req *entity.UpdateUserRequest) (*entity.User, error)
+	UpdateUserProfile(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error)
 	UpdateUserData(id int, updates map[string]any) (*entity.User, error)
 	EmailExists(email string) (bool, error)
 }
@@ -86,7 +87,7 @@ func (a *AuthUseCase) GetMe(id int) (*entity.User, error) {
 	return a.userUseCase.GetUserByID(id)
 }
 
-func (a *AuthUseCase) UpdateMe(id int, req *entity.UpdateUserRequest) (*entity.User, error) {
+func (a *AuthUseCase) UpdateMe(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
 	return a.userUseCase.UpdateUserProfile(id, req)
 }
 

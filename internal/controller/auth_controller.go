@@ -88,7 +88,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 	}
 
 	userID := currentUser.UserID
-	var req entity.UpdateUserRequest
+	var req entity.UpdateUserProfileRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
