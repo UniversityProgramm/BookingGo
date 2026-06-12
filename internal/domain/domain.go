@@ -18,7 +18,7 @@ var (
 	ErrNotImplemented            = errors.New("not implemented")
 	ErrBookingNotFinished        = errors.New("booking not finished")
 	ErrNotificationsAlreadyRead  = errors.New("all notifications is already read")
-	ErrBookingAlreadyActive      = errors.New("booking is active right now")
+	ErrBookingIsActive           = errors.New("booking is active right now")
 	ErrOnlyForStaffOrAdmin       = errors.New("only for staff or admin")
 	ErrTotpAlreadyEnabled        = errors.New("totp already enabled")
 	ErrTotpSecretNotSet          = errors.New("totp secret not set")

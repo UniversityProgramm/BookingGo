@@ -135,7 +135,7 @@ func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
 	}
 	now := time.Now().UTC()
 	if booking.SlotStart.Before(now) {
-		return domain.ErrBookingAlreadyActive
+		return domain.ErrBookingIsActive
 	}
 
 	_, err = b.bookingRepo.SetBookingCancel(bookingID, userID)

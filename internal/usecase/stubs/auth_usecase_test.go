@@ -125,36 +125,11 @@ var testAuthUser = &entity.User{
 	},
 }
 
-func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByEmailFunc: func(email string) (*entity.User, error) {
-			return nil, domain.ErrInvalidEmail
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	stubTotpService := &StubTotpService{}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	_, err := authUseCase.Login("notfound@example.com", "password123")
-	if !errors.Is(err, domain.ErrInvalidEmail) {
-		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
-	}
-}
-
-func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByEmailFunc: func(email string) (*entity.User, error) {
-			return testAuthUser, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	stubTotpService := &StubTotpService{}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	_, err := authUseCase.Login("test@example.com", "wrong_password")
-	if !errors.Is(err, domain.ErrInvalidPassword) {
-		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
-	}
+var userWithTotp = &entity.User{
+	ID:            1,
+	IsTotpEnabled: true,
+	TotpSecret:    "SECRET123",
+	PasswordHash:  testAuthUser.PasswordHash,
 }
 
 func TestAuthUseCase_Login_Success(t *testing.T) {
@@ -169,8 +144,14 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
+
+	loginReq := &entity.LoginUserRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	token, err := authUseCase.Login("test@example.com", "password123")
+	token, err := authUseCase.Login(loginReq)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -180,24 +161,47 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	}
 }
 
-func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
+func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
-			return nil, domain.ErrEmailTaken
+		GetUserByEmailFunc: func(email string) (*entity.User, error) {
+			return nil, domain.ErrInvalidEmail
 		},
 	}
 
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	_, err := authUseCase.Register(&entity.CreateUserRequest{
-		Email:    "taken@example.com",
-		Password: "qwerty123",
-		FIO:      "Test User",
-	})
 
-	if !errors.Is(err, domain.ErrEmailTaken) {
-		t.Errorf("Ожидалась ошибка ErrEmailTaken, получена: %v", err)
+	loginReq := &entity.LoginUserRequest{
+		Email:    "not_found@example.com",
+		Password: "password123",
+	}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
+	_, err := authUseCase.Login(loginReq)
+	if !errors.Is(err, domain.ErrInvalidEmail) {
+		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByEmailFunc: func(email string) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+
+	loginReq := &entity.LoginUserRequest{
+		Email:    "test@example.com",
+		Password: "wrong_password",
+	}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
+	_, err := authUseCase.Login(loginReq)
+	if !errors.Is(err, domain.ErrInvalidPassword) {
+		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
 	}
 }
 
@@ -235,6 +239,44 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 	}
 }
 
+func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
+			return nil, domain.ErrEmailTaken
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
+	_, err := authUseCase.Register(&entity.CreateUserRequest{
+		Email:    "taken@example.com",
+		Password: "qwerty123",
+		FIO:      "Test User",
+	})
+
+	if !errors.Is(err, domain.ErrEmailTaken) {
+		t.Errorf("Ожидалась ошибка ErrEmailTaken, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
+	_, err := authUseCase.GetMe(1)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
 func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
@@ -252,9 +294,9 @@ func TestAuthUseCase_GetUserByID_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
+func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+		UpdateUserProfileFunc: func(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -262,7 +304,9 @@ func TestAuthUseCase_GetUserByID_Success(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	_, err := authUseCase.GetMe(1)
+	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
+		Phone: new("+79991234567"),
+	})
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -288,9 +332,12 @@ func TestAuthUseCase_UpdateUser_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
+func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
-		UpdateUserProfileFunc: func(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return testAuthUser, nil
+		},
+		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -298,8 +345,47 @@ func TestAuthUseCase_UpdateUser_Success(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
-		Phone: new("+79991234567"),
+	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+		CurrentPassword: "password123",
+		NewPassword:     "new",
+	})
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return userWithTotp, nil
+		},
+		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+			if updates["password_hash"] == "" {
+				t.Error("password_hash не был обновлён")
+			}
+			return userWithTotp, nil
+		},
+	}
+	stubOutbox := &StubOutboxRepository{
+		CreateEventFunc: func(event *entity.OutboxEvent) error {
+			if event.EventType != string(enum.ChangePasswordType) {
+				t.Errorf("Неверный тип события: %s", event.EventType)
+			}
+			return nil
+		},
+	}
+	stubTotp := &StubTotpService{
+		ValidateCodeFunc: func(secret, code string) bool {
+			return secret == "SECRET123" && code == "123456"
+		},
+	}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
+	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+		CurrentPassword: "password123",
+		NewPassword:     "newSecurePass!",
+		OtpCode:         "123456",
 	})
 
 	if err != nil {
@@ -368,12 +454,6 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -395,12 +475,6 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -425,70 +499,97 @@ func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
 	}
 }
 
-func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
+func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return userWithTotp, nil
+			return testAuthUser, nil
+		},
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
 		},
 		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			if updates["password_hash"] == "" {
-				t.Error("password_hash не был обновлён")
+			if updates["email"] != "new@example.com" {
+				t.Errorf("Неверный email в updates: %v", updates["email"])
 			}
-			return userWithTotp, nil
+
+			updated := *testAuthUser
+			updated.Email = "new@example.com"
+			return &updated, nil
 		},
 	}
+
 	stubOutbox := &StubOutboxRepository{
 		CreateEventFunc: func(event *entity.OutboxEvent) error {
-			if event.EventType != string(enum.ChangePasswordType) {
+			if event.EventType != string(enum.ChangeEmailType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
 			}
 			return nil
 		},
 	}
-	stubTotp := &StubTotpService{
-		ValidateCodeFunc: func(secret, code string) bool {
-			return secret == "SECRET123" && code == "123456"
-		},
-	}
+
+	stubTotp := &StubTotpService{}
 
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
-		CurrentPassword: "password123",
-		NewPassword:     "newSecurePass!",
+	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		NewEmail:        "new@example.com",
+		ConfirmPassword: "password123",
 		OtpCode:         "123456",
 	})
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
+	if updatedUser.Email != "new@example.com" {
+		t.Errorf("Email не обновился: ожидался 'new@example.com', получен '%s'", updatedUser.Email)
+	}
 }
 
-func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
+func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return testAuthUser, nil
+			return userWithTotp, nil
+		},
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
 		},
 		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			return testAuthUser, nil
+			if updates["email"] != "new@example.com" {
+				t.Errorf("Неверный email в updates: %v", updates["email"])
+			}
+
+			updated := *userWithTotp
+			updated.Email = "new@example.com"
+			return &updated, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
-	stubTotpService := &StubTotpService{}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
-		CurrentPassword: "password123",
-		NewPassword:     "new",
+	stubOutbox := &StubOutboxRepository{
+		CreateEventFunc: func(event *entity.OutboxEvent) error {
+			if event.EventType != string(enum.ChangeEmailType) {
+				t.Errorf("Неверный тип события: %s", event.EventType)
+			}
+			return nil
+		},
+	}
+
+	stubTotp := &StubTotpService{
+		ValidateCodeFunc: func(secret, code string) bool {
+			return true
+		},
+	}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
+	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+		NewEmail:        "new@example.com",
+		ConfirmPassword: "password123",
+		OtpCode:         "123456",
 	})
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if updatedUser.Email != "new@example.com" {
+		t.Errorf("Email не обновился: ожидался 'new@example.com', получен '%s'", updatedUser.Email)
 	}
 }
 
@@ -561,12 +662,6 @@ func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -587,102 +682,6 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrTotpSecretNotSet) {
 		t.Errorf("Ожидалась ошибка ErrTotpSecretNotSet (требуется код), получена: %v", err)
-	}
-}
-
-func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		Email:         "old@example.com",
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
-
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return userWithTotp, nil
-		},
-		EmailExistsFunc: func(email string) (bool, error) {
-			return false, nil
-		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			if updates["email"] != "new@example.com" {
-				t.Errorf("Неверный email в updates: %v", updates["email"])
-			}
-
-			updated := *userWithTotp
-			updated.Email = "new@example.com"
-			return &updated, nil
-		},
-	}
-
-	stubOutbox := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
-			if event.EventType != string(enum.ChangeEmailType) {
-				t.Errorf("Неверный тип события: %s", event.EventType)
-			}
-			return nil
-		},
-	}
-
-	stubTotp := &StubTotpService{
-		ValidateCodeFunc: func(secret, code string) bool {
-			return true
-		},
-	}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
-		NewEmail:        "new@example.com",
-		ConfirmPassword: "password123",
-		OtpCode:         "123456",
-	})
-
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-	if updatedUser.Email != "new@example.com" {
-		t.Errorf("Email не обновился: ожидался 'new@example.com', получен '%s'", updatedUser.Email)
-	}
-}
-
-func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
-		},
-	}
-	stubOutbox := &StubOutboxRepository{}
-	stubTotp := &StubTotpService{}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	_, err := authUseCase.SetupTotp(999)
-
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
-}
-
-func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		Email:         "test@example.com",
-		IsTotpEnabled: true,
-	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return userWithTotp, nil
-		},
-	}
-	stubOutbox := &StubOutboxRepository{}
-	stubTotp := &StubTotpService{}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	_, err := authUseCase.SetupTotp(1)
-
-	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
-		t.Errorf("Ожидалась ошибка ErrTotpAlreadyEnabled, получена: %v", err)
 	}
 }
 
@@ -722,6 +721,72 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 	}
 }
 
+func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+	stubOutbox := &StubOutboxRepository{}
+	stubTotp := &StubTotpService{}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
+	_, err := authUseCase.SetupTotp(999)
+
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return userWithTotp, nil
+		},
+	}
+	stubOutbox := &StubOutboxRepository{}
+	stubTotp := &StubTotpService{}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
+	_, err := authUseCase.SetupTotp(1)
+
+	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
+		t.Errorf("Ожидалась ошибка ErrTotpAlreadyEnabled, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
+	userWithSecret := &entity.User{
+		ID:            1,
+		IsTotpEnabled: false,
+		TotpSecret:    "SECRET123",
+	}
+	stubUserUseCase := &StubUserUseCase{
+		GetUserByIDFunc: func(id int) (*entity.User, error) {
+			return userWithSecret, nil
+		},
+		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+			if updates["is_totp_enabled"] != true {
+				t.Errorf("Ожидалось is_totp_enabled=true, получено: %v", updates["is_totp_enabled"])
+			}
+			return userWithSecret, nil
+		},
+	}
+	stubOutbox := &StubOutboxRepository{}
+	stubTotp := &StubTotpService{
+		ValidateCodeFunc: func(secret, code string) bool {
+			return secret == "SECRET123" && code == "123456"
+		},
+	}
+
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
+	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
 func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
@@ -740,11 +805,6 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -809,32 +869,30 @@ func TestAuthUseCase_VerifyTotp_InvalidCode(t *testing.T) {
 	}
 }
 
-func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
-	userWithSecret := &entity.User{
-		ID:            1,
-		IsTotpEnabled: false,
-		TotpSecret:    "SECRET123",
-	}
+func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return userWithSecret, nil
+			return userWithTotp, nil
 		},
 		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			if updates["is_totp_enabled"] != true {
-				t.Errorf("Ожидалось is_totp_enabled=true, получено: %v", updates["is_totp_enabled"])
+			if updates["is_totp_enabled"] != false {
+				t.Errorf("Ожидалось is_totp_enabled=false, получено: %v", updates["is_totp_enabled"])
 			}
-			return userWithSecret, nil
+			return userWithTotp, nil
 		},
 	}
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
-			return secret == "SECRET123" && code == "123456"
+			return true
 		},
 	}
 
 	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
+	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
+		CurrentPassword: "password123",
+		OtpCode:         "123456",
+	})
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -886,12 +944,6 @@ func TestAuthUseCase_DisableTotp_NotEnabled(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash, // хэш "password123"
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -916,12 +968,6 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -942,41 +988,5 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
 		t.Errorf("Ожидалась ошибка ErrCurPasswordIsNotCorrect, получена: %v", err)
-	}
-}
-
-func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
-	userWithTotp := &entity.User{
-		ID:            1,
-		IsTotpEnabled: true,
-		TotpSecret:    "SECRET123",
-		PasswordHash:  testAuthUser.PasswordHash,
-	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
-			return userWithTotp, nil
-		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			if updates["is_totp_enabled"] != false {
-				t.Errorf("Ожидалось is_totp_enabled=false, получено: %v", updates["is_totp_enabled"])
-			}
-			return userWithTotp, nil
-		},
-	}
-	stubOutbox := &StubOutboxRepository{}
-	stubTotp := &StubTotpService{
-		ValidateCodeFunc: func(secret, code string) bool {
-			return true
-		},
-	}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp)
-	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
-		CurrentPassword: "password123",
-		OtpCode:         "123456",
-	})
-
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
 }

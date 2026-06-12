@@ -117,20 +117,6 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	_, err := useCase.GetUserByID(1)
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
-}
-
 func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
@@ -145,15 +131,15 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
+func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
-		GetByEmailFunc: func(email string) (*entity.User, error) {
+		GetByIDFunc: func(id int) (*entity.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
 
-	_, err := useCase.GetUserByEmail("email")
+	_, err := useCase.GetUserByID(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
@@ -173,23 +159,17 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
+func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
-		EmailExistsFunc: func(email string) (bool, error) {
-			return true, nil
+		GetByEmailFunc: func(email string) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
 
-	_, err := useCase.CreateUser(&entity.CreateUserRequest{
-		Email:    "takenemail@mail.ru",
-		Password: "123456",
-		FIO:      "Test user",
-		Phone:    "123123123",
-	})
-
-	if !errors.Is(err, domain.ErrEmailTaken) {
-		t.Errorf("Ожидалась ошибка ErrEmailTaken, получена: %v", err)
+	_, err := useCase.GetUserByEmail("email")
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
 }
 
@@ -219,21 +199,23 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
+func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
+		EmailExistsFunc: func(email string) (bool, error) {
+			return true, nil
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
-	req := &entity.UpdateUserProfileRequest{
-		FIO:   new("new test fio"),
-		Phone: new("123123123"),
-	}
 
-	_, err := useCase.UpdateUserProfile(1, req)
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	_, err := useCase.CreateUser(&entity.CreateUserRequest{
+		Email:    "takenemail@mail.ru",
+		Password: "123456",
+		FIO:      "Test user",
+		Phone:    "123123123",
+	})
+
+	if !errors.Is(err, domain.ErrEmailTaken) {
+		t.Errorf("Ожидалась ошибка ErrEmailTaken, получена: %v", err)
 	}
 }
 
@@ -275,15 +257,19 @@ func TestUserUseCase_UpdateUserProfile_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
+func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
-		DeleteFunc: func(id int) error {
-			return domain.ErrUserNotFound
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
+	req := &entity.UpdateUserProfileRequest{
+		FIO:   new("new test fio"),
+		Phone: new("123123123"),
+	}
 
-	err := useCase.DeleteUser(1)
+	_, err := useCase.UpdateUserProfile(1, req)
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
@@ -303,17 +289,15 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
+func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
+		DeleteFunc: func(id int) error {
+			return domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
 
-	updates := map[string]any{"fio": "New Name"}
-	_, err := useCase.UpdateUserData(999, updates)
-
+	err := useCase.DeleteUser(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
@@ -325,13 +309,11 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 			return testUser, nil
 		},
 		UpdateFunc: func(id int, updates map[string]any) (*entity.User, error) {
-			// Проверяем, что переданы правильные данные
 			if fio, ok := updates["fio"]; ok {
 				if fio != "Updated FIO" {
 					t.Errorf("Неверное значение FIO: %v", fio)
 				}
 			}
-			// Возвращаем обновлённого пользователя
 			updated := *testUser
 			updated.FIO = "Updated FIO"
 			return &updated, nil
@@ -350,7 +332,23 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_EmailExists_True(t *testing.T) {
+func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	updates := map[string]any{"fio": "New Name"}
+	_, err := useCase.UpdateUserData(999, updates)
+
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
+func TestUserUseCase_EmailExists_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		EmailExistsFunc: func(email string) (bool, error) {
 			if email == "taken@example.com" {
@@ -367,23 +365,6 @@ func TestUserUseCase_EmailExists_True(t *testing.T) {
 	}
 	if !exists {
 		t.Error("Ожидалось, что email занят")
-	}
-}
-
-func TestUserUseCase_EmailExists_False(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		EmailExistsFunc: func(email string) (bool, error) {
-			return false, nil
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	exists, err := useCase.EmailExists("free@example.com")
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-	if exists {
-		t.Error("Ожидалось, что email свободен")
 	}
 }
 
@@ -405,20 +386,6 @@ func TestUserUseCase_EmailExists_Error(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	_, err := useCase.GetUserByEmailContext(context.Background(), "email")
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
-}
-
 func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
@@ -430,5 +397,19 @@ func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
 	_, err := useCase.GetUserByEmailContext(context.Background(), "email@mail.ru")
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.GetUserByEmailContext(context.Background(), "email")
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
 }

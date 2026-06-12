@@ -132,7 +132,7 @@ func (bc *BookingController) CancelMyBooking(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Запись с такими параметрами не найдена или вы не имеете к ней доступа",
 			})
-		} else if errors.Is(err, domain.ErrBookingAlreadyActive) {
+		} else if errors.Is(err, domain.ErrBookingIsActive) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Время записи уже активно, запись нельзя отменить",
 			})

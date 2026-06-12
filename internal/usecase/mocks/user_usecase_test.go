@@ -43,7 +43,7 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 
 	_, err := useCase.GetAllUsers()
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 }
 
@@ -61,10 +61,10 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 
 	user, err := useCase.GetUserByID(1)
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user == nil {
-		t.Fatal("User should not be nil")
+		t.Error("User should not be nil")
 	}
 	if user.Email != testUser.Email {
 		t.Errorf("Expected email %s, got %s", testUser.Email, user.Email)
@@ -85,7 +85,7 @@ func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 
 	_, err := useCase.GetUserByID(1)
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -103,10 +103,10 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 
 	user, err := useCase.GetUserByEmail(testUser.Email)
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user == nil {
-		t.Fatal("User should not be nil")
+		t.Error("User should not be nil")
 	}
 	if user.Email != testUser.Email {
 		t.Errorf("Expected email %s, got %s", testUser.Email, user.Email)
@@ -127,7 +127,7 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 
 	_, err := useCase.GetUserByEmail("not_exist_email@example.com")
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -145,10 +145,10 @@ func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
 
 	user, err := useCase.GetUserByEmailContext(context.Background(), testUser.Email)
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user == nil {
-		t.Fatal("User should not be nil")
+		t.Error("User should not be nil")
 	}
 	if user.Email != testUser.Email {
 		t.Errorf("Expected email %s, got %s", testUser.Email, user.Email)
@@ -169,7 +169,7 @@ func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
 
 	_, err := useCase.GetUserByEmailContext(context.Background(), "not_exist_email@example.com")
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -207,10 +207,10 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 
 	user, err := useCase.CreateUser(req)
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user == nil {
-		t.Fatal("User should not be nil")
+		t.Error("User should not be nil")
 	}
 	if user.Email != "new@example.com" {
 		t.Errorf("Expected email 'new@example.com', got '%s'", user.Email)
@@ -238,7 +238,7 @@ func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 
 	_, err := useCase.CreateUser(req)
 	if !errors.Is(err, domain.ErrEmailTaken) {
-		t.Fatalf("Expected Email taken, got error: %v", err)
+		t.Errorf("Expected Email taken, got error: %v", err)
 	}
 }
 
@@ -282,7 +282,7 @@ func TestUserUseCase_UpdateUserProfile_Success_1(t *testing.T) {
 	user, err := useCase.UpdateUserProfile(userID, req)
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user.FIO != newFIO {
 		t.Errorf("Expected FIO '%s', got '%s'", newFIO, user.FIO)
@@ -326,7 +326,7 @@ func TestUserUseCase_UpdateUserProfile_Success_2(t *testing.T) {
 	user, err := useCase.UpdateUserProfile(userID, req)
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user.FIO != newFIO {
 		t.Errorf("Expected FIO '%s', got '%s'", newFIO, user.FIO)
@@ -367,7 +367,7 @@ func TestUserUseCase_UpdateUserProfile_Success_3(t *testing.T) {
 	user, err := useCase.UpdateUserProfile(userID, req)
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user.Phone != newPhone {
 		t.Errorf("Expected Phone '%s', got '%s'", newPhone, user.Phone)
@@ -396,7 +396,7 @@ func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 	_, err := useCase.UpdateUserProfile(userID, req)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -432,7 +432,7 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 	user, err := useCase.UpdateUserData(userID, req)
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 	if user.Email != newEmail {
 		t.Errorf("Expected Email '%s', got '%s'", newEmail, user.Email)
@@ -459,7 +459,7 @@ func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
 	_, err := useCase.UpdateUserData(userID, req)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -470,14 +470,14 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 	mockRepo := NewMockUserRepository(ctrl)
 
 	mockRepo.EXPECT().
-		Delete(gomock.Any()).
+		Delete(1).
 		Return(nil)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 	err := useCase.DeleteUser(1)
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 }
 
@@ -488,14 +488,14 @@ func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 	mockRepo := NewMockUserRepository(ctrl)
 
 	mockRepo.EXPECT().
-		Delete(gomock.Any()).
+		Delete(1).
 		Return(domain.ErrUserNotFound)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 	err := useCase.DeleteUser(1)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Fatalf("Expected ErrUserNotFound, got error: %v", err)
+		t.Errorf("Expected ErrUserNotFound, got error: %v", err)
 	}
 }
 
@@ -506,15 +506,15 @@ func TestUserUseCase_EmailExists_Success(t *testing.T) {
 	mockRepo := NewMockUserRepository(ctrl)
 
 	mockRepo.EXPECT().
-		EmailExists(gomock.Any()).
+		EmailExists("exist@example.com").
 		Return(true, nil)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 
-	_, err := useCase.EmailExists("not_exist@example.com")
+	_, err := useCase.EmailExists("exist@example.com")
 
 	if err != nil {
-		t.Fatalf("Expected success, got error: %v", err)
+		t.Errorf("Expected success, got error: %v", err)
 	}
 }
 
@@ -527,7 +527,7 @@ func TestUserUseCase_EmailExists_RepoErr(t *testing.T) {
 	dbError := errors.New("database connection failed")
 
 	mockRepo.EXPECT().
-		EmailExists(gomock.Any()).
+		EmailExists("not_exist@example.com").
 		Return(false, dbError)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
@@ -535,6 +535,6 @@ func TestUserUseCase_EmailExists_RepoErr(t *testing.T) {
 	_, err := useCase.EmailExists("not_exist@example.com")
 
 	if !errors.Is(err, dbError) {
-		t.Fatalf("Expected dbError, got error: %v", err)
+		t.Errorf("Expected dbError, got error: %v", err)
 	}
 }

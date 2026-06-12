@@ -35,13 +35,13 @@ func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepositor
 	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService}
 }
 
-func (a *AuthUseCase) Login(email string, password string) (string, error) {
-	user, err := a.userUseCase.GetUserByEmail(email)
+func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
+	user, err := a.userUseCase.GetUserByEmail(req.Email)
 	if err != nil {
 		return "", domain.ErrInvalidEmail
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		return "", domain.ErrInvalidPassword
 	}

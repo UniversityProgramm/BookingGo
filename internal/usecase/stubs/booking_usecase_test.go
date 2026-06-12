@@ -112,6 +112,76 @@ var (
 	}
 )
 
+func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
+	futureTime := time.Now().Add(24 * time.Hour)
+
+	stubBookingRepo := &StubBookingRepository{
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			return true, nil
+		},
+		CreateFunc: func(ctx context.Context, booking *entity.Booking) error {
+			return nil
+		},
+	}
+
+	stubUserRepo := &StubUserRepository{
+		GetByIDContextFunc: func(ctx context.Context, id int) (*entity.User, error) {
+			return testClient, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+
+	req := &entity.CreateBookingRequest{
+		SlotStart:          futureTime,
+		ProblemDescription: "Тестовая проблема",
+	}
+
+	booking, err := useCase.CreateBooking(context.Background(), testClient.ID, req)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if booking == nil {
+		t.Fatal("Запись не была создана")
+	}
+}
+
+func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
+	existingStart := time.Now().Add(24 * time.Hour)
+	existingEnd := time.Now().Add(25 * time.Hour)
+
+	newStart := time.Now().Add(24 * time.Hour).Add(30 * time.Minute)
+
+	stubBookingRepo := &StubBookingRepository{
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			if existingStart.Before(end) && start.Before(existingEnd) {
+				return false, nil
+			}
+			return true, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{
+		GetByIDContextFunc: func(ctx context.Context, id int) (*entity.User, error) {
+			return testClient, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	req := &entity.CreateBookingRequest{
+		SlotStart:          newStart,
+		ProblemDescription: "Тест пересечения",
+	}
+
+	_, err := useCase.CreateBooking(context.Background(), testClient.ID, req)
+
+	if !errors.Is(err, domain.ErrSlotNotAvailable) {
+		t.Errorf("Ожидалась ошибка ErrSlotNotAvailable для пересекающегося слота, получена: %v", err)
+	}
+}
+
 func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
 	stubBookingRepo := &StubBookingRepository{}
 	stubUserRepo := &StubUserRepository{
@@ -184,42 +254,6 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
-	futureTime := time.Now().Add(24 * time.Hour) // завтра
-
-	stubBookingRepo := &StubBookingRepository{
-		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
-			return true, nil
-		},
-		CreateFunc: func(ctx context.Context, booking *entity.Booking) error {
-			return nil
-		},
-	}
-
-	stubUserRepo := &StubUserRepository{
-		GetByIDContextFunc: func(ctx context.Context, id int) (*entity.User, error) {
-			return testClient, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-
-	req := &entity.CreateBookingRequest{
-		SlotStart:          futureTime,
-		ProblemDescription: "Тестовая проблема",
-	}
-
-	booking, err := useCase.CreateBooking(context.Background(), testClient.ID, req)
-
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-	if booking == nil {
-		t.Fatal("Запись не была создана")
-	}
-}
-
 func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	expectedBookings := []entity.Booking{*testBooking}
 
@@ -231,7 +265,7 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 			return expectedBookings, nil
 		},
 	}
-	stubUserRepo := &StubUserRepository{} // не используется в этом методе
+	stubUserRepo := &StubUserRepository{}
 
 	stubNotifier := &StubOutboxRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
@@ -260,6 +294,26 @@ func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
 	}
 	if !errors.Is(err, dbError) {
 		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBooking, nil
+		},
+		SetBookingCancelFunc: func(bookingID, userID int) (*entity.Booking, error) {
+			return &entity.Booking{}, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubOutboxRepository{}
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	err := useCase.CancelMyBooking(10, testClient.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
 }
 
@@ -292,63 +346,38 @@ func TestBookingUseCase_CancelMyBooking_BookingAlreadyActive(t *testing.T) {
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
 	err := useCase.CancelMyBooking(10, testClient.ID)
 
-	if !errors.Is(err, domain.ErrBookingAlreadyActive) {
+	if !errors.Is(err, domain.ErrBookingIsActive) {
 		t.Errorf("Ожидалась ошибка ErrBookingAlreadyActive, получена: %v", err)
 	}
 
 }
 
-func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
+func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
 	stubBookingRepo := &StubBookingRepository{
 		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBooking, nil
+			return testBookingPast, nil
 		},
-		SetBookingCancelFunc: func(bookingID, userID int) (*entity.Booking, error) {
-			return &entity.Booking{}, nil
+		SetBookingCompleteFunc: func(bookingID int) (*entity.Booking, error) {
+			updated := *testBookingPast
+			updated.Status = enum.StatusCompleted
+			return &updated, nil
 		},
 	}
-	stubUserRepo := &StubUserRepository{}
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
 
 	stubNotifier := &StubOutboxRepository{}
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	err := useCase.CancelMyBooking(10, testClient.ID)
+	result, err := useCase.CompleteBookingByID(100)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
-}
-
-func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
-	existingStart := time.Now().Add(24 * time.Hour)
-	existingEnd := time.Now().Add(25 * time.Hour)
-
-	newStart := time.Now().Add(24 * time.Hour).Add(30 * time.Minute)
-
-	stubBookingRepo := &StubBookingRepository{
-		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
-			if existingStart.Before(end) && start.Before(existingEnd) {
-				return false, nil
-			}
-			return true, nil
-		},
-	}
-	stubUserRepo := &StubUserRepository{
-		GetByIDContextFunc: func(ctx context.Context, id int) (*entity.User, error) {
-			return testClient, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	req := &entity.CreateBookingRequest{
-		SlotStart:          newStart,
-		ProblemDescription: "Тест пересечения",
-	}
-
-	_, err := useCase.CreateBooking(context.Background(), testClient.ID, req)
-
-	if !errors.Is(err, domain.ErrSlotNotAvailable) {
-		t.Errorf("Ожидалась ошибка ErrSlotNotAvailable для пересекающегося слота, получена: %v", err)
+	if result.Status != enum.StatusCompleted {
+		t.Errorf("Статус не обновлен: %s", result.Status)
 	}
 }
 
@@ -394,32 +423,29 @@ func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
 	}
 }
 
-func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBookingPast, nil
-		},
-		SetBookingCompleteFunc: func(bookingID int) (*entity.Booking, error) {
-			updated := *testBookingPast
-			updated.Status = enum.StatusCompleted
-			return &updated, nil
-		},
-	}
+func TestBookingUseCase_GetAllBookings_Staff_Success(t *testing.T) {
+	expectedBookings := []entity.Booking{*testBooking, *testBookingPast}
+
 	stubUserRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
 			return testStaff, nil
 		},
 	}
 
+	stubBookingRepo := &StubBookingRepository{
+		GetAllFunc: func() ([]entity.Booking, error) {
+			return expectedBookings, nil
+		},
+	}
+
 	stubNotifier := &StubOutboxRepository{}
+
 	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	result, err := useCase.CompleteBookingByID(100)
+
+	_, err := useCase.GetAllBookings(testStaff.ID)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-	if result.Status != enum.StatusCompleted {
-		t.Errorf("Статус не обновлен: %s", result.Status)
 	}
 }
 
@@ -461,31 +487,5 @@ func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
-}
-
-func TestBookingUseCase_GetAllBookings_StaffSuccess(t *testing.T) {
-	expectedBookings := []entity.Booking{*testBooking, *testBookingPast}
-
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testStaff, nil
-		},
-	}
-
-	stubBookingRepo := &StubBookingRepository{
-		GetAllFunc: func() ([]entity.Booking, error) {
-			return expectedBookings, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-
-	_, err := useCase.GetAllBookings(testStaff.ID)
-
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
 }

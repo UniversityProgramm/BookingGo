@@ -20,13 +20,13 @@ func NewAuthController(authUseCase *usecase.AuthUseCase) *AuthController {
 }
 
 func (ac *AuthController) Login(c *gin.Context) {
-	var req *entity.LoginUserRequest
+	var req entity.LoginUserRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
 	}
 
-	token, err := ac.authUseCase.Login(req.Email, req.Password)
+	token, err := ac.authUseCase.Login(&req)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidEmail):
