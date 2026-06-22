@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"BookingGo/internal/cache"
 	"BookingGo/internal/customTemplates"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -22,10 +24,19 @@ type NotificationUseCase struct {
 	notificationRepo NotificationRepository
 	bookingRepo      BookingRepository
 	userRepo         UserRepository
+	cache            cache.Cache
 }
 
 func NewNotificationUseCase(notificationRepo NotificationRepository, bookingRepo BookingRepository, userRepo UserRepository) *NotificationUseCase {
 	return &NotificationUseCase{notificationRepo: notificationRepo, bookingRepo: bookingRepo, userRepo: userRepo}
+}
+
+func (n *NotificationUseCase) invalidateUserCache(ctx context.Context, userID int) {
+	prefix := fmt.Sprintf("user:%d", userID)
+	err := n.cache.Delete(ctx, prefix)
+	if err != nil {
+		logger.Log.Error("[AuthUseCase] Failed to invalidate user cache", "error", err.Error())
+	}
 }
 
 func (n *NotificationUseCase) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
@@ -133,7 +144,14 @@ func (n *NotificationUseCase) GetMyNotifications(userID int) ([]entity.Notificat
 }
 
 func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity.NotificationSettings) error {
-	return n.notificationRepo.UpdateSettings(userID, req)
+	err := n.notificationRepo.UpdateSettings(userID, req)
+	if err != nil {
+		return err
+	}
+
+	n.invalidateUserCache(context.Background(), userID)
+
+	return nil
 }
 
 func (n *NotificationUseCase) MarkAllAsRead(userID int) error {
