@@ -28,4 +28,5 @@ var (
 	ErrJetStreamConnection       = errors.New("jetstream connection error")
 	ErrStreamAdd                 = errors.New("stream add error")
 	ErrStreamAlreadyExists       = errors.New("stream already exists")
+	ErrCacheKeyNotFound          = errors.New("cache key not found")
 )

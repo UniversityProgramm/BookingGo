@@ -2,10 +2,15 @@ package usecase
 
 import (
 	"BookingGo/internal/auth"
+	"BookingGo/internal/cache"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -29,10 +34,19 @@ type AuthUseCase struct {
 	userUseCase UserUseCaseInterface
 	outboxRepo  OutboxRepository
 	totpService TotpService
+	cache       cache.Cache
 }
 
-func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService) *AuthUseCase {
-	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService}
+func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService, cache cache.Cache) *AuthUseCase {
+	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService, cache: cache}
+}
+
+func (a *AuthUseCase) invalidateUserCache(ctx context.Context, userID int) {
+	prefix := fmt.Sprintf("user:%d", userID)
+	err := a.cache.Delete(ctx, prefix)
+	if err != nil {
+		logger.Log.Error("[AuthUseCase] Failed to invalidate user cache", "error", err.Error())
+	}
 }
 
 func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
@@ -59,11 +73,11 @@ func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
 	outboxEvent, err := entity.NewOutboxEvent(enum.AuthType, payload)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to create outboxEvent", "eventType", enum.AuthType, "error", err.Error())
-	}
-
-	err = a.outboxRepo.CreateEvent(outboxEvent)
-	if err != nil {
-		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.AuthType, "error", err.Error())
+	} else {
+		err = a.outboxRepo.CreateEvent(outboxEvent)
+		if err != nil {
+			logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.AuthType, "error", err.Error())
+		}
 	}
 
 	return token, nil
@@ -83,12 +97,38 @@ func (a *AuthUseCase) Register(req *entity.CreateUserRequest) (string, error) {
 	return token, nil
 }
 
-func (a *AuthUseCase) GetMe(id int) (*entity.User, error) {
-	return a.userUseCase.GetUserByID(id)
+func (a *AuthUseCase) GetMe(userID int) (*entity.User, error) {
+	key := fmt.Sprintf("user:%d", userID)
+
+	var cachedUser entity.User
+	err := a.cache.Get(context.Background(), key, &cachedUser)
+	if err == nil {
+		logger.Log.Debug("[AuthUseCase] Got user cache ", "key", key)
+		return &cachedUser, nil
+	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
+		logger.Log.Debug("[AuthUseCase] Cache key not found", "key", key, "error", err.Error())
+	}
+
+	user, err := a.userUseCase.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.cache.Set(context.Background(), key, user, 300*time.Second); err != nil {
+		logger.Log.Warn("[AuthUseCase] Cache set failed", "error", err.Error())
+	}
+
+	return user, nil
 }
 
-func (a *AuthUseCase) UpdateMe(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
-	return a.userUseCase.UpdateUserProfile(id, req)
+func (a *AuthUseCase) UpdateMe(userID int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
+	user, err := a.userUseCase.UpdateUserProfile(userID, req)
+	if err != nil {
+		return nil, err
+	}
+	a.invalidateUserCache(context.Background(), userID)
+
+	return user, nil
 }
 
 func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) error {
@@ -144,8 +184,8 @@ func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) 
 	return err
 }
 
-func (a *AuthUseCase) ChangeEmail(id int, req *entity.ChangeEmailRequest) (*entity.User, error) {
-	user, err := a.userUseCase.GetUserByID(id)
+func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*entity.User, error) {
+	user, err := a.userUseCase.GetUserByID(userID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -176,6 +216,8 @@ func (a *AuthUseCase) ChangeEmail(id int, req *entity.ChangeEmailRequest) (*enti
 		"email": req.NewEmail,
 	}
 	updatedUser, err := a.userUseCase.UpdateUserData(user.ID, updates)
+
+	a.invalidateUserCache(context.Background(), userID)
 
 	payload := map[string]any{
 		"user_id":    user.ID,
@@ -220,8 +262,8 @@ func (a *AuthUseCase) SetupTotp(id int) (string, error) {
 	return otpUrl, nil
 }
 
-func (a *AuthUseCase) VerifyTotp(id int, req *entity.VerifyTotpRequest) error {
-	user, err := a.userUseCase.GetUserByID(id)
+func (a *AuthUseCase) VerifyTotp(userID int, req *entity.VerifyTotpRequest) error {
+	user, err := a.userUseCase.GetUserByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -244,11 +286,13 @@ func (a *AuthUseCase) VerifyTotp(id int, req *entity.VerifyTotpRequest) error {
 		return err
 	}
 
+	a.invalidateUserCache(context.Background(), userID)
+
 	return nil
 }
 
-func (a *AuthUseCase) DisableTotp(id int, req *entity.DisableTotpRequest) error {
-	user, err := a.userUseCase.GetUserByID(id)
+func (a *AuthUseCase) DisableTotp(userID int, req *entity.DisableTotpRequest) error {
+	user, err := a.userUseCase.GetUserByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -275,6 +319,8 @@ func (a *AuthUseCase) DisableTotp(id int, req *entity.DisableTotpRequest) error 
 	if err != nil {
 		return err
 	}
+
+	a.invalidateUserCache(context.Background(), userID)
 
 	return nil
 }
