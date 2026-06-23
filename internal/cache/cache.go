@@ -12,6 +12,7 @@ type Cache interface {
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	DeleteByPrefix(ctx context.Context, prefix string) error
+	Close() error
 }
 
 func Init() Cache {
@@ -24,7 +25,6 @@ func Init() Cache {
 			cacheService = NewNoopCache()
 		} else {
 			cacheService = redisCache
-			defer redisCache.Close()
 			logger.Log.Info("[RedisCache] Redis connected")
 		}
 	} else {

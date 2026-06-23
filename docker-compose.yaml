@@ -14,6 +14,8 @@ services:
         condition: service_healthy  # Ждем, пока БД не пройдет чек на работоспособность
       nats:
         condition: service_started
+      redis:
+        condition: service_healthy
     networks:
       - booking-network
 
@@ -37,6 +39,22 @@ services:
     networks:
       - booking-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: booking_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - booking-network
+
   nats:
     image: nats:2.10-alpine
     container_name: booking_nats
@@ -49,6 +67,7 @@ services:
 
 volumes:
   pg_data:
+  redis_data:
 
 networks:
   booking-network:

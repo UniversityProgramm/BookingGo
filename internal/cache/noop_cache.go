@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"BookingGo/internal/domain"
 	"context"
 	"time"
 )
@@ -12,7 +13,7 @@ func NewNoopCache() *NoopCache {
 }
 
 func (c *NoopCache) Get(ctx context.Context, key string, dest any) error {
-	return nil
+	return domain.ErrCacheKeyNotFound
 }
 
 func (c *NoopCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
@@ -24,5 +25,9 @@ func (c *NoopCache) Delete(ctx context.Context, key string) error {
 }
 
 func (c *NoopCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	return nil
+}
+
+func (c *NoopCache) Close() error {
 	return nil
 }

@@ -21,7 +21,7 @@ func (r *NotificationRepository) CreateNotif(notification *entity.Notification) 
 
 func (r *NotificationRepository) GetAllNotificationsByUserID(userID int) ([]entity.Notification, error) {
 	var notifications []entity.Notification
-	err := r.db.Where("recipient_id = ?", userID).Find(&notifications).Error
+	err := r.db.Where("recipient_id = ?", userID).Order("created_at ASC").Find(&notifications).Error
 	if err != nil {
 		return nil, err
 	}

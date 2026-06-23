@@ -42,8 +42,8 @@ func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepositor
 }
 
 func (a *AuthUseCase) invalidateUserCache(ctx context.Context, userID int) {
-	prefix := fmt.Sprintf("user:%d", userID)
-	err := a.cache.Delete(ctx, prefix)
+	key := fmt.Sprintf("user:%d", userID)
+	err := a.cache.Delete(ctx, key)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to invalidate user cache", "error", err.Error())
 	}

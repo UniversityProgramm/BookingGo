@@ -6,3 +6,4 @@ docker-compose.yml
 tmp/
 bin/
 .env.docker
+docker_commands.txt

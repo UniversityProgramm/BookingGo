@@ -50,8 +50,8 @@ func (b *BookingUseCase) invalidateSlotCache(ctx context.Context, t time.Time) {
 }
 
 func (b *BookingUseCase) invalidateUserBookingsCache(ctx context.Context, userID int) {
-	prefix := fmt.Sprintf("user:%d:bookings", userID)
-	err := b.cache.Delete(ctx, prefix)
+	key := fmt.Sprintf("user:%d:bookings", userID)
+	err := b.cache.Delete(ctx, key)
 	if err != nil {
 		logger.Log.Error("[BookingUseCase] Failed to invalidate user bookings cache", "error", err.Error())
 	}
@@ -179,7 +179,7 @@ func (b *BookingUseCase) GetMyBookings(userID int) ([]entity.Booking, error) {
 	var myBookings []entity.Booking
 	err := b.cache.Get(context.Background(), key, &myBookings)
 	if err == nil {
-		logger.Log.Debug("[BookingUseCase] Got bookings for user cache ", "key", key)
+		logger.Log.Debug("[BookingUseCase] Got bookings cache for user", "key", key)
 		return myBookings, nil
 	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
 		logger.Log.Debug("[BookingUseCase] Cache key not found", "key", key, "error", err.Error())

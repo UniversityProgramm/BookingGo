@@ -40,13 +40,13 @@ func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 					"notifications": notifications,
 					"warning":       "Все уведомления уже прочитаны"},
 				)
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"notifications": notifications,
+					"warning":       "Уведомления получены, но не удалось пометить их как прочитанные"},
+				)
 			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"notifications": notifications,
-				"warning":       "Уведомления получены, но не удалось пометить их как прочитанные"},
-			)
-
+			return
 		}
 	}
 
@@ -70,8 +70,9 @@ func (nc *NotificationController) UpdateNotificationSettings(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка изменения настроек уведомлений"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка изменения настроек уведомлений"})
 		return
 	}
 

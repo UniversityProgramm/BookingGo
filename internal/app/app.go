@@ -27,6 +27,7 @@ type Dependencies struct {
 type Workers struct {
 	OutboxWorker          *worker.OutboxWorker
 	ExternalBookingWorker *worker.ExternalBookingWorker
+	cacheService          cache.Cache
 }
 
 func (r *Workers) Close() {
@@ -35,8 +36,19 @@ func (r *Workers) Close() {
 	if r.OutboxWorker != nil {
 		r.OutboxWorker.Stop()
 	}
+	logger.Log.Info("[app] Outbox worker closed")
+
 	if r.ExternalBookingWorker != nil {
 		r.ExternalBookingWorker.Stop()
+	}
+	logger.Log.Info("[app] External booking worker closed")
+
+	if r.cacheService != nil {
+		if err := r.cacheService.Close(); err != nil {
+			logger.Log.Warn("[app] Failed to close cache", "error", err.Error())
+		} else {
+			logger.Log.Info("[app] Cache connection closed")
+		}
 	}
 
 	natsClient.Close()
@@ -77,7 +89,7 @@ func Init(router *gin.Engine) (*Workers, error) {
 	cacheService := cache.Init()
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
-	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo)
+	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo, cacheService)
 	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService, cacheService)
 	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, outboxRepo, cacheService)
 	logger.Log.Info("[app] All usecases initialized")
@@ -126,5 +138,6 @@ func Init(router *gin.Engine) (*Workers, error) {
 	return &Workers{
 		OutboxWorker:          outboxWorker,
 		ExternalBookingWorker: bookingWorker,
+		cacheService:          cacheService,
 	}, nil
 }

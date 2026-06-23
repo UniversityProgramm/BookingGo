@@ -3,10 +3,12 @@ package usecase
 import (
 	"BookingGo/internal/cache"
 	"BookingGo/internal/customTemplates"
+	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -27,15 +29,24 @@ type NotificationUseCase struct {
 	cache            cache.Cache
 }
 
-func NewNotificationUseCase(notificationRepo NotificationRepository, bookingRepo BookingRepository, userRepo UserRepository) *NotificationUseCase {
-	return &NotificationUseCase{notificationRepo: notificationRepo, bookingRepo: bookingRepo, userRepo: userRepo}
+func NewNotificationUseCase(notificationRepo NotificationRepository, bookingRepo BookingRepository, userRepo UserRepository, cache cache.Cache) *NotificationUseCase {
+	return &NotificationUseCase{notificationRepo: notificationRepo, bookingRepo: bookingRepo, userRepo: userRepo, cache: cache}
 }
 
 func (n *NotificationUseCase) invalidateUserCache(ctx context.Context, userID int) {
-	prefix := fmt.Sprintf("user:%d", userID)
-	err := n.cache.Delete(ctx, prefix)
+	key := fmt.Sprintf("user:%d", userID)
+	err := n.cache.Delete(ctx, key)
 	if err != nil {
-		logger.Log.Error("[AuthUseCase] Failed to invalidate user cache", "error", err.Error())
+		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user cache", "error", err.Error())
+	}
+}
+
+func (n *NotificationUseCase) invalidateUserNotificationsCache(ctx context.Context, userID int) {
+	key := fmt.Sprintf("user:%d:notifications", userID)
+
+	err := n.cache.Delete(ctx, key)
+	if err != nil {
+		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user cache", "error", err.Error())
 	}
 }
 
@@ -64,6 +75,8 @@ func (n *NotificationUseCase) CreateNotification(userID int, notificationType en
 	if err != nil {
 		return err
 	}
+
+	n.invalidateUserNotificationsCache(context.Background(), userID)
 
 	if user.UserNotificationSettings.IsEmailSend {
 		if err := sendToEmail(user.Email, title, text); err != nil {
@@ -129,18 +142,28 @@ func renderNotificationTemplate(name string, data map[string]interface{}) string
 	return strings.TrimSpace(buf.String())
 }
 
-func sendToEmail(email string, title string, text string) error {
-	logger.Log.Info("[NotificationUseCase] Sent email")
-	return nil
-}
-
-func sendToPhone(phone string, title string, text string) error {
-	logger.Log.Info("[NotificationUseCase] Sent SMS")
-	return nil
-}
-
 func (n *NotificationUseCase) GetMyNotifications(userID int) ([]entity.Notification, error) {
-	return n.notificationRepo.GetAllNotificationsByUserID(userID)
+	key := fmt.Sprintf("user:%d:notifications", userID)
+
+	var myNotifications []entity.Notification
+	err := n.cache.Get(context.Background(), key, &myNotifications)
+	if err == nil {
+		logger.Log.Debug("[NotificationUseCase] Got notifications cache for user", "key", key)
+		return myNotifications, nil
+	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
+		logger.Log.Debug("[NotificationUseCase] Cache key not found", "key", key, "error", err.Error())
+	}
+
+	myNotifications, err = n.notificationRepo.GetAllNotificationsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := n.cache.Set(context.Background(), key, myNotifications, 60*time.Second); err != nil {
+		logger.Log.Warn("[NotificationUseCase] Cache set failed", "error", err.Error())
+	}
+
+	return myNotifications, nil
 }
 
 func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity.NotificationSettings) error {
@@ -155,5 +178,22 @@ func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity
 }
 
 func (n *NotificationUseCase) MarkAllAsRead(userID int) error {
-	return n.notificationRepo.MarkAllAsRead(userID)
+	err := n.notificationRepo.MarkAllAsRead(userID)
+	if err != nil {
+		return err
+	}
+
+	n.invalidateUserNotificationsCache(context.Background(), userID)
+
+	return nil
+}
+
+func sendToEmail(email string, title string, text string) error {
+	logger.Log.Info("[NotificationUseCase] Sent email")
+	return nil
+}
+
+func sendToPhone(phone string, title string, text string) error {
+	logger.Log.Info("[NotificationUseCase] Sent SMS")
+	return nil
 }
