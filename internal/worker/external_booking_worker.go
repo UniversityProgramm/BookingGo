@@ -66,7 +66,6 @@ func (w *ExternalBookingWorker) Run() error {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		defer logger.Log.Info("[ExternalBookingWorker] Worker stopped")
 
 		for {
 			if w.ctx.Err() != nil {

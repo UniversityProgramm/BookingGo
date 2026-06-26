@@ -173,6 +173,34 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 	}
 }
 
+func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+			return testUser, nil
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.GetUserByEmailContext(context.Background(), "email@mail.ru")
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+			return nil, domain.ErrUserNotFound
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	_, err := useCase.GetUserByEmailContext(context.Background(), "email")
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
 func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		EmailExistsFunc: func(email string) (bool, error) {
@@ -275,34 +303,6 @@ func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestUserUseCase_DeleteUser_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		DeleteFunc: func(id int) error {
-			return nil
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	err := useCase.DeleteUser(1)
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-}
-
-func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		DeleteFunc: func(id int) error {
-			return domain.ErrUserNotFound
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	err := useCase.DeleteUser(1)
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
-	}
-}
-
 func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		GetByIDFunc: func(id int) (*entity.User, error) {
@@ -348,6 +348,34 @@ func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
 	}
 }
 
+func TestUserUseCase_DeleteUser_Success(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		DeleteFunc: func(id int) error {
+			return nil
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	err := useCase.DeleteUser(1)
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
+	stubRepo := &StubUserRepository{
+		DeleteFunc: func(id int) error {
+			return domain.ErrUserNotFound
+		},
+	}
+	useCase := usecase.NewUserUseCase(stubRepo)
+
+	err := useCase.DeleteUser(1)
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
+	}
+}
+
 func TestUserUseCase_EmailExists_Success(t *testing.T) {
 	stubRepo := &StubUserRepository{
 		EmailExistsFunc: func(email string) (bool, error) {
@@ -383,33 +411,5 @@ func TestUserUseCase_EmailExists_Error(t *testing.T) {
 	}
 	if err != dbErr {
 		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
-	}
-}
-
-func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
-			return testUser, nil
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	_, err := useCase.GetUserByEmailContext(context.Background(), "email@mail.ru")
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-}
-
-func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
-			return nil, domain.ErrUserNotFound
-		},
-	}
-	useCase := usecase.NewUserUseCase(stubRepo)
-
-	_, err := useCase.GetUserByEmailContext(context.Background(), "email")
-	if !errors.Is(err, domain.ErrUserNotFound) {
-		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
 }

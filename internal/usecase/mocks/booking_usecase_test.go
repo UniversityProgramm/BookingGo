@@ -65,14 +65,23 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	mockUserRepo.EXPECT().
+		GetByIDContext(ctx, testClient.ID).
+		Return(testClient, nil)
+
+	mockCache.EXPECT().
+		Get(ctx, gomock.Any(), gomock.Any()).
+		Return(domain.ErrCacheKeyNotFound)
 
 	mockBookingRepo.EXPECT().
 		IsSlotAvailable(ctx, futureTime, gomock.Any()).
 		Return(true, nil)
 
-	mockUserRepo.EXPECT().
-		GetByIDContext(ctx, testClient.ID).
-		Return(testClient, nil)
+	mockCache.EXPECT().
+		Set(ctx, gomock.Any(), true, 30*time.Second).
+		Return(nil)
 
 	mockBookingRepo.EXPECT().
 		Create(ctx, gomock.Any()).
@@ -80,6 +89,14 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 			b.ID = 100
 			return nil
 		})
+
+	mockCache.EXPECT().
+		DeleteByPrefix(ctx, gomock.Any()).
+		Return(nil)
+
+	mockCache.EXPECT().
+		Delete(ctx, gomock.Any()).
+		Return(nil)
 
 	mockOutboxRepo.EXPECT().
 		CreateEventContext(ctx, gomock.Cond(func(e *entity.OutboxEvent) bool {
@@ -90,7 +107,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		})).
 		Return(nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          futureTime,
@@ -110,6 +127,69 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 	}
 }
 
+func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	futureTime := time.Now().Add(24 * time.Hour)
+	ctx := context.Background()
+	slotCheckedInDB := false
+
+	mockBookingRepo := NewMockBookingRepository(ctrl)
+	mockUserRepo := NewMockUserRepository(ctrl)
+	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	mockUserRepo.EXPECT().
+		GetByIDContext(ctx, testClient.ID).
+		Return(testClient, nil)
+
+	mockCache.EXPECT().
+		Get(ctx, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, key string, dest any) error {
+			if boolPtr, ok := dest.(*bool); ok {
+				*boolPtr = true
+			}
+			return nil
+		})
+
+	mockBookingRepo.EXPECT().
+		IsSlotAvailable(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, start, end time.Time) (bool, error) {
+			slotCheckedInDB = true
+			return true, nil
+		}).
+		MaxTimes(0)
+
+	mockBookingRepo.EXPECT().
+		Create(ctx, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, b *entity.Booking) error {
+			b.ID = 100
+			return nil
+		})
+
+	mockCache.EXPECT().DeleteByPrefix(ctx, gomock.Any()).Return(nil)
+	mockCache.EXPECT().Delete(ctx, gomock.Any()).Return(nil)
+
+	mockOutboxRepo.EXPECT().CreateEventContext(ctx, gomock.Any()).Return(nil)
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
+
+	req := &entity.CreateBookingRequest{
+		SlotStart:          futureTime,
+		ProblemDescription: "Test cache hit",
+	}
+
+	_, err := useCase.CreateBooking(ctx, testClient.ID, req)
+
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+	if slotCheckedInDB {
+		t.Error("IsSlotAvailable should not be called on cache hit")
+	}
+}
+
 func TestBookingUseCase_CreateBooking_PastTimeRange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -120,12 +200,13 @@ func TestBookingUseCase_CreateBooking_PastTimeRange(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByIDContext(ctx, testClient.ID).
 		Return(testClient, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          pastTime,
@@ -150,16 +231,25 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByIDContext(ctx, testClient.ID).
 		Return(testClient, nil)
 
+	mockCache.EXPECT().
+		Get(ctx, gomock.Any(), gomock.Any()).
+		Return(domain.ErrCacheKeyNotFound)
+
 	mockBookingRepo.EXPECT().
 		IsSlotAvailable(ctx, futureTime, gomock.Any()).
 		Return(false, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	mockCache.EXPECT().
+		Set(ctx, gomock.Any(), false, 30*time.Second).
+		Return(nil)
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          futureTime,
@@ -183,12 +273,13 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByIDContext(ctx, testClient.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
@@ -209,6 +300,7 @@ func TestBookingUseCase_GetAllBookings_Staff_Success(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(testStaff.ID).
@@ -219,7 +311,7 @@ func TestBookingUseCase_GetAllBookings_Staff_Success(t *testing.T) {
 		GetAll().
 		Return(expectedBookings, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.GetAllBookings(testStaff.ID)
 
@@ -235,12 +327,13 @@ func TestBookingUseCase_GetAllBookings_Client_Forbidden(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(testClient.ID).
 		Return(testClient, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.GetAllBookings(testClient.ID)
 
@@ -256,12 +349,13 @@ func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(testStaff.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.GetAllBookings(testStaff.ID)
 
@@ -277,6 +371,7 @@ func TestBookingUseCase_CompleteBookingByID_Success(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBookingPast.ID).
@@ -298,7 +393,7 @@ func TestBookingUseCase_CompleteBookingByID_Success(t *testing.T) {
 		})).
 		Return(nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	result, err := useCase.CompleteBookingByID(testBookingPast.ID)
 
@@ -317,12 +412,13 @@ func TestBookingUseCase_CompleteBookingByID_BookingNotFound(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBookingPast.ID).
 		Return(nil, domain.ErrBookingNotFound)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.CompleteBookingByID(testBookingPast.ID)
 
@@ -338,12 +434,13 @@ func TestBookingUseCase_CompleteBookingByID_NotFinished(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBooking.ID).
 		Return(testBooking, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.CompleteBookingByID(testBooking.ID)
 
@@ -359,18 +456,148 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	mockCache.EXPECT().
+		Get(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(domain.ErrCacheKeyNotFound)
 
 	expectedBookings := []entity.Booking{*testBooking}
 	mockBookingRepo.EXPECT().
 		GetAllBookingsByUserID(testClient.ID).
 		Return(expectedBookings, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	mockCache.EXPECT().
+		Set(gomock.Any(), gomock.Any(), gomock.Any(), 60*time.Second).
+		Return(nil)
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	_, err := useCase.GetMyBookings(testClient.ID)
 
 	if err != nil {
 		t.Errorf("Expected success, got error: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_CacheHit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBookingRepo := NewMockBookingRepository(ctrl)
+	mockUserRepo := NewMockUserRepository(ctrl)
+	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	expectedBookings := []entity.Booking{*testBooking}
+	dbCalled := false
+
+	mockCache.EXPECT().
+		Get(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, key string, dest any) error {
+			if bookingsPtr, ok := dest.(*[]entity.Booking); ok {
+				*bookingsPtr = expectedBookings
+			}
+			return nil
+		})
+
+	mockBookingRepo.EXPECT().
+		GetAllBookingsByUserID(gomock.Any()).
+		DoAndReturn(func(id int) ([]entity.Booking, error) {
+			dbCalled = true
+			return expectedBookings, nil
+		}).
+		MaxTimes(0)
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
+
+	bookings, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+	if len(bookings) != 1 {
+		t.Errorf("Expected 1 booking, got %d", len(bookings))
+	}
+	if dbCalled {
+		t.Error("DB should not be called on cache hit")
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_CacheMiss(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBookingRepo := NewMockBookingRepository(ctrl)
+	mockUserRepo := NewMockUserRepository(ctrl)
+	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	expectedBookings := []entity.Booking{*testBooking}
+	cacheSetCalled := false
+
+	mockCache.EXPECT().
+		Get(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(domain.ErrCacheKeyNotFound)
+
+	mockBookingRepo.EXPECT().
+		GetAllBookingsByUserID(testClient.ID).
+		Return(expectedBookings, nil)
+
+	mockCache.EXPECT().
+		Set(gomock.Any(), gomock.Any(), gomock.Any(), 60*time.Second).
+		DoAndReturn(func(ctx context.Context, key string, value any, ttl time.Duration) error {
+			cacheSetCalled = true
+			return nil
+		})
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
+
+	bookings, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+	if len(bookings) != 1 {
+		t.Errorf("Expected 1 booking, got %d", len(bookings))
+	}
+	if !cacheSetCalled {
+		t.Error("Cache Set should be called on cache miss")
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_CacheSetError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBookingRepo := NewMockBookingRepository(ctrl)
+	mockUserRepo := NewMockUserRepository(ctrl)
+	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
+
+	expectedBookings := []entity.Booking{*testBooking}
+
+	mockCache.EXPECT().
+		Get(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(domain.ErrCacheKeyNotFound)
+
+	mockBookingRepo.EXPECT().
+		GetAllBookingsByUserID(testClient.ID).
+		Return(expectedBookings, nil)
+
+	mockCache.EXPECT().
+		Set(gomock.Any(), gomock.Any(), gomock.Any(), 60*time.Second).
+		Return(errors.New("cache error"))
+
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
+
+	bookings, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Errorf("Cache error should not break flow, got: %v", err)
+	}
+	if len(bookings) != 1 {
+		t.Errorf("Expected 1 booking, got %d", len(bookings))
 	}
 }
 
@@ -381,6 +608,7 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBooking.ID).
@@ -393,6 +621,14 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 			Status: enum.StatusCancelled,
 		}, nil)
 
+	mockCache.EXPECT().
+		DeleteByPrefix(gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	mockCache.EXPECT().
+		Delete(gomock.Any(), gomock.Any()).
+		Return(nil)
+
 	mockOutboxRepo.EXPECT().
 		CreateEvent(gomock.Cond(func(e *entity.OutboxEvent) bool {
 			if e.EventType != string(enum.CancelBookingType) {
@@ -402,7 +638,7 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 		})).
 		Return(nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	err := useCase.CancelMyBooking(testBooking.ID, testBooking.UserID)
 
@@ -418,12 +654,13 @@ func TestBookingUseCase_CancelMyBooking_BookingIsActive(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBookingPast.ID).
 		Return(testBookingPast, nil)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	err := useCase.CancelMyBooking(testBookingPast.ID, testBookingPast.UserID)
 
@@ -439,12 +676,13 @@ func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
 	mockBookingRepo := NewMockBookingRepository(ctrl)
 	mockUserRepo := NewMockUserRepository(ctrl)
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
 		GetBookingByID(testBookingPast.ID).
 		Return(nil, domain.ErrBookingNotFound)
 
-	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo)
+	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
 	err := useCase.CancelMyBooking(testBookingPast.ID, testBookingPast.UserID)
 

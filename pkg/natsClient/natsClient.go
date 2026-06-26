@@ -34,9 +34,6 @@ func Init() error {
 		nats.ReconnectHandler(func(nc *nats.Conn) {
 			logger.Log.Info("[NATS] Reconnected", "url", nc.ConnectedUrl())
 		}),
-		nats.ClosedHandler(func(nc *nats.Conn) {
-			logger.Log.Info("[NATS] Connection closed")
-		}),
 		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
 			logger.Log.Error("[NATS] Async error", "error", err, "subject", sub.Subject)
 		}),

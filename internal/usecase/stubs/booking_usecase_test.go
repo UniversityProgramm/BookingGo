@@ -113,13 +113,17 @@ var (
 )
 
 func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
+	outboxCalled := false
 	futureTime := time.Now().Add(24 * time.Hour)
+	cacheSlotInvalidated := false
+	cacheUserBookingsInvalidated := false
 
 	stubBookingRepo := &StubBookingRepository{
 		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
 			return true, nil
 		},
 		CreateFunc: func(ctx context.Context, booking *entity.Booking) error {
+			booking.ID = 100
 			return nil
 		},
 	}
@@ -130,8 +134,27 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubNotifier := &StubOutboxRepository{
+		CreateEventContextFunc: func(ctx context.Context, event *entity.OutboxEvent) error {
+			outboxCalled = true
+			if event.EventType != string(enum.NewBookingType) {
+				t.Errorf("Неверный тип события: %s", event.EventType)
+			}
+			return nil
+		},
+	}
+	stubCacheService := &StubCacheService{
+		DeleteByPrefixFunc: func(ctx context.Context, prefix string) error {
+			cacheSlotInvalidated = true
+			return nil
+		},
+		DeleteFunc: func(ctx context.Context, key string) error {
+			cacheUserBookingsInvalidated = true
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 
 	req := &entity.CreateBookingRequest{
 		SlotStart:          futureTime,
@@ -145,6 +168,61 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 	}
 	if booking == nil {
 		t.Fatal("Запись не была создана")
+	}
+	if !cacheSlotInvalidated {
+		t.Error("Ожидалась инвалидация кэша слотов, но она не была вызвана")
+	}
+	if !cacheUserBookingsInvalidated {
+		t.Error("Ожидалась инвалидация кэша записей пользователя, но она не была вызвана")
+	}
+	if !outboxCalled {
+		t.Error("Outbox событие должно было быть создано")
+	}
+}
+
+func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
+	futureTime := time.Now().Add(24 * time.Hour)
+	slotCheckedInDB := false
+
+	stubBookingRepo := &StubBookingRepository{
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			slotCheckedInDB = true
+			return true, nil
+		},
+		CreateFunc: func(ctx context.Context, booking *entity.Booking) error {
+			return nil
+		},
+	}
+
+	stubUserRepo := &StubUserRepository{
+		GetByIDContextFunc: func(ctx context.Context, id int) (*entity.User, error) {
+			return testClient, nil
+		},
+	}
+
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			if boolPtr, ok := dest.(*bool); ok {
+				*boolPtr = true
+			}
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, &StubOutboxRepository{}, stubCache)
+
+	req := &entity.CreateBookingRequest{
+		SlotStart:          futureTime,
+		ProblemDescription: "Тест кэша",
+	}
+
+	_, err := useCase.CreateBooking(context.Background(), testClient.ID, req)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if slotCheckedInDB {
+		t.Error("IsSlotAvailable не должен вызываться при cache hit")
 	}
 }
 
@@ -169,7 +247,9 @@ func TestBookingUseCase_CreateBooking_OverlappingSlots(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          newStart,
 		ProblemDescription: "Тест пересечения",
@@ -191,7 +271,9 @@ func TestBookingUseCase_CreateBooking_PastTime(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(-1 * time.Hour),
 		ProblemDescription: "test",
@@ -217,7 +299,9 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 
 	futureTime := time.Now().Add(24 * time.Hour)
 	req := &entity.CreateBookingRequest{
@@ -241,7 +325,9 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 	req := &entity.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
 		ProblemDescription: "test",
@@ -254,172 +340,172 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
-	expectedBookings := []entity.Booking{*testBooking}
+func TestBookingUseCase_IsSlotAvailableCached_CacheHit(t *testing.T) {
+	start := time.Now().Add(24 * time.Hour)
+	end := start.Add(time.Hour)
+	dbCalled := false
 
 	stubBookingRepo := &StubBookingRepository{
-		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
-			if id != testClient.ID {
-				t.Errorf("Неверный UserID: %d", id)
-			}
-			return expectedBookings, nil
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			dbCalled = true
+			return true, nil
 		},
 	}
-	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.GetMyBookings(testClient.ID)
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			if boolPtr, ok := dest.(*bool); ok {
+				*boolPtr = true
+			}
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	available, err := useCase.IsSlotAvailableCached(context.Background(), start, end)
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
 	}
+	if !available {
+		t.Error("Ожидалось available=true из кэша")
+	}
+	if dbCalled {
+		t.Error("БД не должна вызываться при cache hit")
+	}
 }
 
-func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
-	dbError := errors.New("database error")
+func TestBookingUseCase_IsSlotAvailableCached_CacheMiss(t *testing.T) {
+	start := time.Now().Add(24 * time.Hour)
+	end := start.Add(time.Hour)
+	cacheSetCalled := false
+
 	stubBookingRepo := &StubBookingRepository{
-		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
-			return nil, dbError
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			return true, nil
 		},
 	}
-	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.GetMyBookings(testClient.ID)
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			return domain.ErrCacheKeyNotFound
+		},
+		SetFunc: func(ctx context.Context, key string, value any, ttl time.Duration) error {
+			cacheSetCalled = true
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	available, err := useCase.IsSlotAvailableCached(context.Background(), start, end)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if !available {
+		t.Error("Ожидалось available=true из БД")
+	}
+	if !cacheSetCalled {
+		t.Error("Cache Set должен вызываться при cache miss")
+	}
+}
+
+func TestBookingUseCase_IsSlotAvailableCached_CacheReturnsFalse(t *testing.T) {
+	start := time.Now().Add(24 * time.Hour)
+	end := start.Add(time.Hour)
+	dbCalled := false
+
+	stubBookingRepo := &StubBookingRepository{
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			dbCalled = true
+			return false, nil
+		},
+	}
+
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			if boolPtr, ok := dest.(*bool); ok {
+				*boolPtr = false
+			}
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	available, err := useCase.IsSlotAvailableCached(context.Background(), start, end)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if available {
+		t.Error("Ожидалось available=false из кэша")
+	}
+	if dbCalled {
+		t.Error("БД не должна вызываться при cache hit")
+	}
+}
+
+func TestBookingUseCase_IsSlotAvailableCached_DBError(t *testing.T) {
+	start := time.Now().Add(24 * time.Hour)
+	end := start.Add(time.Hour)
+	dbError := errors.New("database error")
+
+	stubBookingRepo := &StubBookingRepository{
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			return false, dbError
+		},
+	}
+
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			return domain.ErrCacheKeyNotFound
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	_, err := useCase.IsSlotAvailableCached(context.Background(), start, end)
 
 	if err == nil {
-		t.Fatal("Ожидалась ошибка, получена nil")
+		t.Fatal("Ожидалась ошибка БД, получена nil")
 	}
 	if !errors.Is(err, dbError) {
-		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
+		t.Errorf("Ожидалась ошибка БД, получена: %v", err)
 	}
 }
 
-func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
+func TestBookingUseCase_IsSlotAvailableCached_CacheSetError(t *testing.T) {
+	start := time.Now().Add(24 * time.Hour)
+	end := start.Add(time.Hour)
+	cacheError := errors.New("cache error")
+
 	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBooking, nil
-		},
-		SetBookingCancelFunc: func(bookingID, userID int) (*entity.Booking, error) {
-			return &entity.Booking{}, nil
+		IsSlotAvailableFunc: func(ctx context.Context, start, end time.Time) (bool, error) {
+			return true, nil
 		},
 	}
-	stubUserRepo := &StubUserRepository{}
 
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	err := useCase.CancelMyBooking(10, testClient.ID)
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			return domain.ErrCacheKeyNotFound
+		},
+		SetFunc: func(ctx context.Context, key string, value any, ttl time.Duration) error {
+			return cacheError
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	available, err := useCase.IsSlotAvailableCached(context.Background(), start, end)
 
 	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+		t.Fatalf("Ошибка кэша не должна ломать флоу, получена: %v", err)
 	}
-}
-
-func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return nil, domain.ErrBookingNotFound
-		},
-	}
-	stubUserRepo := &StubUserRepository{}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	err := useCase.CancelMyBooking(999, testClient.ID)
-
-	if !errors.Is(err, domain.ErrBookingNotFound) {
-		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
-	}
-}
-
-func TestBookingUseCase_CancelMyBooking_BookingAlreadyActive(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBookingPast, nil
-		},
-	}
-	stubUserRepo := &StubUserRepository{}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	err := useCase.CancelMyBooking(10, testClient.ID)
-
-	if !errors.Is(err, domain.ErrBookingIsActive) {
-		t.Errorf("Ожидалась ошибка ErrBookingAlreadyActive, получена: %v", err)
-	}
-
-}
-
-func TestBookingUseCase_CompleteBooking_Success(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBookingPast, nil
-		},
-		SetBookingCompleteFunc: func(bookingID int) (*entity.Booking, error) {
-			updated := *testBookingPast
-			updated.Status = enum.StatusCompleted
-			return &updated, nil
-		},
-	}
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testStaff, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	result, err := useCase.CompleteBookingByID(100)
-
-	if err != nil {
-		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
-	}
-	if result.Status != enum.StatusCompleted {
-		t.Errorf("Статус не обновлен: %s", result.Status)
-	}
-}
-
-func TestBookingUseCase_CompleteBooking_BookingNotFound(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return nil, domain.ErrBookingNotFound
-		},
-	}
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testStaff, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.CompleteBookingByID(100)
-
-	if !errors.Is(err, domain.ErrBookingNotFound) {
-		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
-	}
-}
-
-func TestBookingUseCase_CompleteBooking_NotFinishedYet(t *testing.T) {
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
-			return testBooking, nil
-		},
-	}
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testStaff, nil
-		},
-	}
-
-	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
-	_, err := useCase.CompleteBookingByID(101)
-
-	if !errors.Is(err, domain.ErrBookingNotFinished) {
-		t.Errorf("Ожидалась ошибка ErrBookingNotFinished, получена: %v", err)
+	if !available {
+		t.Error("Ожидалось available=true из БД")
 	}
 }
 
@@ -439,8 +525,9 @@ func TestBookingUseCase_GetAllBookings_Staff_Success(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
 
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 
 	_, err := useCase.GetAllBookings(testStaff.ID)
 
@@ -463,7 +550,9 @@ func TestBookingUseCase_GetAllBookings_OnlyForStaffOrAdmin(t *testing.T) {
 	}
 
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 
 	_, err := useCase.GetAllBookings(testClient.ID)
 
@@ -481,11 +570,298 @@ func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
 
 	stubBookingRepo := &StubBookingRepository{}
 	stubNotifier := &StubOutboxRepository{}
-	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier)
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
 
 	_, err := useCase.GetAllBookings(999)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
 	}
+}
+
+func TestBookingUseCase_CompleteBookingByID_Success(t *testing.T) {
+	outboxCalled := false
+
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBookingPast, nil
+		},
+		SetBookingCompleteFunc: func(bookingID int) (*entity.Booking, error) {
+			updated := *testBookingPast
+			updated.Status = enum.StatusCompleted
+			return &updated, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+	stubNotifier := &StubOutboxRepository{
+		CreateEventFunc: func(event *entity.OutboxEvent) error {
+			outboxCalled = true
+			if event.EventType != string(enum.CompleteBookingType) {
+				t.Errorf("Неверный тип события: %s", event.EventType)
+			}
+			return nil
+		},
+	}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	result, err := useCase.CompleteBookingByID(100)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if result.Status != enum.StatusCompleted {
+		t.Errorf("Статус не обновлен: %s", result.Status)
+	}
+	if !outboxCalled {
+		t.Error("Outbox событие должно было быть создано")
+	}
+}
+
+func TestBookingUseCase_CompleteBookingByID_BookingNotFound(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return nil, domain.ErrBookingNotFound
+		},
+	}
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	_, err := useCase.CompleteBookingByID(100)
+
+	if !errors.Is(err, domain.ErrBookingNotFound) {
+		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CompleteBookingByID_NotFinishedYet(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBooking, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{
+		GetByIDFunc: func(id int) (*entity.User, error) {
+			return testStaff, nil
+		},
+	}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	_, err := useCase.CompleteBookingByID(101)
+
+	if !errors.Is(err, domain.ErrBookingNotFinished) {
+		t.Errorf("Ожидалась ошибка ErrBookingNotFinished, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
+	expectedBookings := []entity.Booking{*testBooking}
+
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+			if id != testClient.ID {
+				t.Errorf("Неверный UserID: %d", id)
+			}
+			return expectedBookings, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	_, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_CacheHit(t *testing.T) {
+	expectedBookings := []entity.Booking{*testBooking}
+
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+			return expectedBookings, nil
+		},
+	}
+
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			if boolPtr, ok := dest.(*bool); ok {
+				*boolPtr = true
+			}
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	_, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_CacheMiss(t *testing.T) {
+	expectedBookings := []entity.Booking{*testBooking}
+	cacheSetCalled := false
+
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+			return expectedBookings, nil
+		},
+	}
+
+	stubCache := &StubCacheService{
+		GetFunc: func(ctx context.Context, key string, dest any) error {
+			return domain.ErrCacheKeyNotFound
+		},
+		SetFunc: func(ctx context.Context, key string, value any, ttl time.Duration) error {
+			cacheSetCalled = true
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, &StubUserRepository{}, &StubOutboxRepository{}, stubCache)
+
+	_, err := useCase.GetMyBookings(testClient.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if !cacheSetCalled {
+		t.Error("Cache Set должен вызываться при cache miss")
+	}
+}
+
+func TestBookingUseCase_GetMyBookings_Error(t *testing.T) {
+	dbError := errors.New("database error")
+	stubBookingRepo := &StubBookingRepository{
+		GetAllBookingsByUserIDFunc: func(id int) ([]entity.Booking, error) {
+			return nil, dbError
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	_, err := useCase.GetMyBookings(testClient.ID)
+
+	if err == nil {
+		t.Fatal("Ожидалась ошибка, получена nil")
+	}
+	if !errors.Is(err, dbError) {
+		t.Errorf("Ожидалась оригинальная ошибка, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
+	cacheSlotInvalidated := false
+	cacheUserBookingsInvalidated := false
+	outboxCalled := false
+
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBooking, nil
+		},
+		SetBookingCancelFunc: func(bookingID, userID int) (*entity.Booking, error) {
+			return &entity.Booking{}, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+	stubNotifier := &StubOutboxRepository{
+		CreateEventFunc: func(event *entity.OutboxEvent) error {
+			outboxCalled = true
+			if event.EventType != string(enum.CancelBookingType) {
+				t.Errorf("Неверный тип события: %s", event.EventType)
+			}
+			return nil
+		},
+	}
+	stubCacheService := &StubCacheService{
+		DeleteByPrefixFunc: func(ctx context.Context, prefix string) error {
+			cacheSlotInvalidated = true
+			return nil
+		},
+		DeleteFunc: func(ctx context.Context, key string) error {
+			cacheUserBookingsInvalidated = true
+			return nil
+		},
+	}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	err := useCase.CancelMyBooking(10, testClient.ID)
+
+	if err != nil {
+		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
+	}
+	if !cacheSlotInvalidated {
+		t.Error("Ожидалась инвалидация кэша слотов, но она не была вызвана")
+	}
+	if !cacheUserBookingsInvalidated {
+		t.Error("Ожидалась инвалидация кэша записей пользователя, но она не была вызвана")
+	}
+	if !outboxCalled {
+		t.Error("Outbox событие должно было быть создано")
+	}
+}
+
+func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return nil, domain.ErrBookingNotFound
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	err := useCase.CancelMyBooking(999, testClient.ID)
+
+	if !errors.Is(err, domain.ErrBookingNotFound) {
+		t.Errorf("Ожидалась ошибка ErrBookingNotFound, получена: %v", err)
+	}
+}
+
+func TestBookingUseCase_CancelMyBooking_BookingAlreadyActive(t *testing.T) {
+	stubBookingRepo := &StubBookingRepository{
+		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+			return testBookingPast, nil
+		},
+	}
+	stubUserRepo := &StubUserRepository{}
+
+	stubNotifier := &StubOutboxRepository{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewBookingUseCase(stubBookingRepo, stubUserRepo, stubNotifier, stubCacheService)
+	err := useCase.CancelMyBooking(10, testClient.ID)
+
+	if !errors.Is(err, domain.ErrBookingIsActive) {
+		t.Errorf("Ожидалась ошибка ErrBookingAlreadyActive, получена: %v", err)
+	}
+
 }

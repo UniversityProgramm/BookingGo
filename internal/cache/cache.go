@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=cache.go -destination=usecase/mocks/cache_mocks.go -package=mocks
 type Cache interface {
 	Get(ctx context.Context, key string, dest any) error
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
