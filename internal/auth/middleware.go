@@ -1,7 +1,6 @@
-package middleware
+package auth
 
 import (
-	"BookingGo/internal/auth"
 	"BookingGo/internal/enum"
 	"net/http"
 
@@ -30,7 +29,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := auth.ValidateToken(tokenString)
+		claims, err := ValidateToken(tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": err.Error(),
@@ -43,9 +42,9 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func GetCurrentUser(c *gin.Context) *auth.Claims {
+func GetCurrentUser(c *gin.Context) *Claims {
 	if user, exists := c.Get(ContextKeyUser); exists {
-		if claims, ok := user.(*auth.Claims); ok {
+		if claims, ok := user.(*Claims); ok {
 			return claims
 		}
 	}

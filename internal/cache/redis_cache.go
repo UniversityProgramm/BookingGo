@@ -74,6 +74,22 @@ func (c *RedisCache) DeleteByPrefix(ctx context.Context, prefix string) error {
 	return c.client.Del(ctx, keys...).Err()
 }
 
+func (c *RedisCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	pipe := c.client.Pipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, ttl+time.Second)
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, fmt.Errorf("redis pipeline failed: %w", err)
+	}
+
+	return incr.Val(), nil
+}
+
+func (c *RedisCache) GetClient() *redis.Client {
+	return c.client
+}
+
 func (c *RedisCache) Close() error {
 	return c.client.Close()
 }

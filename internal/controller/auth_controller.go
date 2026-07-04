@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
-	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -63,7 +63,7 @@ func (ac *AuthController) Register(c *gin.Context) {
 }
 
 func (ac *AuthController) GetMe(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -83,7 +83,7 @@ func (ac *AuthController) GetMe(c *gin.Context) {
 }
 
 func (ac *AuthController) UpdateMe(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -112,7 +112,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 }
 
 func (ac *AuthController) ChangePassword(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -143,7 +143,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 }
 
 func (ac *AuthController) ChangeEmail(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -174,7 +174,7 @@ func (ac *AuthController) ChangeEmail(c *gin.Context) {
 }
 
 func (ac *AuthController) SetupTotp(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -196,7 +196,7 @@ func (ac *AuthController) SetupTotp(c *gin.Context) {
 }
 
 func (ac *AuthController) VerifyTotp(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -228,7 +228,7 @@ func (ac *AuthController) VerifyTotp(c *gin.Context) {
 }
 
 func (ac *AuthController) DisableTotp(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return

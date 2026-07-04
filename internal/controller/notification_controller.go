@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
-	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -20,7 +20,7 @@ func NewNotificationController(notificationUseCase *usecase.NotificationUseCase)
 }
 
 func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -54,7 +54,7 @@ func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 }
 
 func (nc *NotificationController) UpdateNotificationSettings(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return

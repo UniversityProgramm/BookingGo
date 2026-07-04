@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
-	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
 	"fmt"
@@ -135,7 +135,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 }
 
 func (u UserController) DeleteUser(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return

@@ -5,6 +5,8 @@ import (
 	"context"
 	"os"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 //go:generate mockgen -source=cache.go -destination=usecase/mocks/cache_mocks.go -package=mocks
@@ -13,25 +15,24 @@ type Cache interface {
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	DeleteByPrefix(ctx context.Context, prefix string) error
+	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
 	Close() error
+	GetClient() *redis.Client
 }
 
 func Init() Cache {
-	var cacheService Cache
 	redisUrl := os.Getenv("REDIS_URL")
-	if redisUrl != "" {
-		redisCache, err := NewRedisCache(redisUrl)
-		if err != nil {
-			logger.Log.Warn("[RedisCache] Redis not available, using noop cache", "error", err.Error())
-			cacheService = NewNoopCache()
-		} else {
-			cacheService = redisCache
-			logger.Log.Info("[RedisCache] Redis connected")
-		}
-	} else {
+	if redisUrl == "" {
 		logger.Log.Warn("[RedisCache] REDIS_URL is not set, using noop cache")
-		cacheService = NewNoopCache()
+		return NewNoopCache()
 	}
 
-	return cacheService
+	redisCache, err := NewRedisCache(redisUrl)
+	if err != nil {
+		logger.Log.Warn("[RedisCache] Redis not available, using noop cache", "error", err.Error())
+		return NewNoopCache()
+	}
+	logger.Log.Info("[RedisCache] Redis connected")
+
+	return redisCache
 }

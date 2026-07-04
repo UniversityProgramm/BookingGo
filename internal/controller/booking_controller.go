@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/entity"
-	"BookingGo/internal/middleware"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -21,7 +21,7 @@ func NewBookingController(bookingUseCase *usecase.BookingUseCase) *BookingContro
 }
 
 func (bc *BookingController) CreateBooking(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -50,7 +50,7 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 }
 
 func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -80,7 +80,7 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 }
 
 func (bc *BookingController) GetAllBookings(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -96,7 +96,7 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 }
 
 func (bc *BookingController) GetMyBookings(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return
@@ -112,7 +112,7 @@ func (bc *BookingController) GetMyBookings(c *gin.Context) {
 }
 
 func (bc *BookingController) CancelMyBooking(c *gin.Context) {
-	currentUser := middleware.GetCurrentUser(c)
+	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 		return

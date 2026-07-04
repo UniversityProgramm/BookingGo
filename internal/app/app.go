@@ -4,6 +4,7 @@ import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/cache"
 	"BookingGo/internal/domain"
+	"BookingGo/internal/ratelimit"
 	"BookingGo/internal/repository"
 	"BookingGo/internal/totp"
 	"BookingGo/internal/usecase"
@@ -22,6 +23,7 @@ type Dependencies struct {
 	AuthUseCase         *usecase.AuthUseCase
 	BookingUseCase      *usecase.BookingUseCase
 	NotificationUseCase *usecase.NotificationUseCase
+	RateLimiter         ratelimit.Limiter
 }
 
 type Workers struct {
@@ -88,6 +90,8 @@ func Init(router *gin.Engine) (*Workers, error) {
 
 	cacheService := cache.Init()
 
+	rateLimiter := ratelimit.Init(cacheService)
+
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo, cacheService)
 	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService, cacheService)
@@ -132,6 +136,7 @@ func Init(router *gin.Engine) (*Workers, error) {
 		AuthUseCase:         authUseCase,
 		BookingUseCase:      bookingUseCase,
 		NotificationUseCase: notificationUseCase,
+		RateLimiter:         rateLimiter,
 	})
 	logger.Log.Info("[app] Router is running")
 

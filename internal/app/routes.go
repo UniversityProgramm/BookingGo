@@ -1,14 +1,18 @@
 package app
 
 import (
+	"BookingGo/internal/auth"
 	"BookingGo/internal/controller"
-	"BookingGo/internal/middleware"
+	"BookingGo/internal/ratelimit"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Обрабатывает пути эндпоинтов
 func SetupRoutes(r *gin.Engine, deps *Dependencies) {
+	rlConfig := ratelimit.DefaultConfig()
+
+	r.Use(ratelimit.RateLimitMiddleware(deps.RateLimiter, rlConfig))
+
 	api := r.Group("/api")
 
 	authController := controller.NewAuthController(deps.AuthUseCase)
@@ -19,7 +23,7 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	}
 
 	protectedGroup := api.Group("/me")
-	protectedGroup.Use(middleware.AuthMiddleware())
+	protectedGroup.Use(auth.AuthMiddleware())
 	{
 		profileGroup := protectedGroup.Group("/profile")
 		{
@@ -53,8 +57,8 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 
 	userController := controller.NewUserController(deps.UserUseCase)
 	staffGroup := api.Group("/staffPanel")
-	staffGroup.Use(middleware.AuthMiddleware())
-	staffGroup.Use(middleware.StaffOnly())
+	staffGroup.Use(auth.AuthMiddleware())
+	staffGroup.Use(auth.StaffOnly())
 	{
 		userStaffGroup := staffGroup.Group("/users")
 		{
@@ -71,8 +75,8 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	}
 
 	adminGroup := api.Group("/adminPanel")
-	adminGroup.Use(middleware.AuthMiddleware())
-	adminGroup.Use(middleware.AdminOnly())
+	adminGroup.Use(auth.AuthMiddleware())
+	adminGroup.Use(auth.AdminOnly())
 	{
 		userAdminGroup := adminGroup.Group("/users")
 		{

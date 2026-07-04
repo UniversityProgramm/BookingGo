@@ -4,6 +4,8 @@ import (
 	"BookingGo/internal/domain"
 	"context"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type NoopCache struct{}
@@ -25,6 +27,14 @@ func (c *NoopCache) Delete(ctx context.Context, key string) error {
 }
 
 func (c *NoopCache) DeleteByPrefix(ctx context.Context, prefix string) error {
+	return nil
+}
+
+func (c *NoopCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	return 0, nil
+}
+
+func (c *NoopCache) GetClient() *redis.Client {
 	return nil
 }
 
