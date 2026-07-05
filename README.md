@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](./coverage.html)
 
-> **Сервис бронирований с уведомлениями, 2FA и real-time обновлениями**
+> **Сервис бронирований с уведомлениями, 2FA**
 
 BookingGo — это REST API для управления бронированиями с поддержкой многоканальных уведомлений (email, SMS, in-app), двухфакторной аутентификации (TOTP), с гарантированной доставкой событий через Outbox-паттерн и поддержкой стороннего брокера сообщений.
 
