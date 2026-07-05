@@ -61,9 +61,13 @@ BookingGo — это REST API для управления бронировани
 ## 🚀 Быстрый старт
 
 ### Требования
-- Go 1.22+
-- Docker и Docker Compose
-- (Опционально) Make
+
+| Компонент | Минимальная версия | Проверить |
+|-----------|-------------------|-----------|
+| Go | 1.22+ | `go version` |
+| Docker | 20.10+ | `docker --version` |
+| Docker Compose | 2.0+ | `docker-compose --version` |
+| Make | 3.81+ | `make --version` |
 
 ### 1. Клонируй репозиторий
 
