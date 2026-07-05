@@ -58,8 +58,6 @@ BookingGo — это REST API для управления бронировани
 
 ---
 
-## 🚀 Быстрый старт
-
 ### Требования
 
 | Компонент | Минимальная версия | Проверить |
@@ -68,9 +66,3 @@ BookingGo — это REST API для управления бронировани
 | Docker | 20.10+ | `docker --version` |
 | Docker Compose | 2.0+ | `docker-compose --version` |
 | Make | 3.81+ | `make --version` |
-
-### 1. Клонируй репозиторий
-
-```bash
-git clone https://github.com/твой-username/BookingGo.git
-cd BookingGo
