@@ -62,6 +62,22 @@ func (ac *AuthController) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"token": token})
 }
 
+func (ac *AuthController) Logout(c *gin.Context) {
+	currentUser := auth.GetCurrentUser(c)
+	if currentUser == nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+		return
+	}
+
+	err := ac.authUseCase.Logout(currentUser.UserID, currentUser.ID, currentUser.ExpiresAt.Time)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при выходе"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Выход выполнен успешно"})
+}
+
 func (ac *AuthController) GetMe(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {

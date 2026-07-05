@@ -9,15 +9,15 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//go:generate mockgen -source=cache.go -destination=usecase/mocks/cache_mocks.go -package=mocks
+//go:generate mockgen -source=cache.go -destination=cache_mocks.go -package=mocks
 type Cache interface {
 	Get(ctx context.Context, key string, dest any) error
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	DeleteByPrefix(ctx context.Context, prefix string) error
 	IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error)
-	Close() error
 	GetClient() *redis.Client
+	Close() error
 }
 
 func Init() Cache {

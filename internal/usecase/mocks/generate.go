@@ -5,5 +5,6 @@ package mocks
 //go:generate mockgen -source=../booking_usecase.go -destination=booking_mocks.go -package=mocks
 //go:generate mockgen -source=../notification_usecase.go -destination=notification_mocks.go -package=mocks
 //go:generate mockgen -source=../user_usecase.go -destination=user_mocks.go -package=mocks
+//go:generate mockgen -source=../../auth/blacklist.go -destination=blacklist_service_mocks.go -package=mocks
 
 var _ = "generate mocks"

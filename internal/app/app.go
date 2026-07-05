@@ -23,6 +23,7 @@ type Dependencies struct {
 	AuthUseCase         *usecase.AuthUseCase
 	BookingUseCase      *usecase.BookingUseCase
 	NotificationUseCase *usecase.NotificationUseCase
+	BlacklistService    auth.Blacklist
 	RateLimiter         ratelimit.Limiter
 }
 
@@ -92,9 +93,11 @@ func Init(router *gin.Engine) (*Workers, error) {
 
 	rateLimiter := ratelimit.Init(cacheService)
 
+	blacklistService := auth.NewBlacklistService(cacheService)
+
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo, cacheService)
-	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService, cacheService)
+	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService, cacheService, blacklistService)
 	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, outboxRepo, cacheService)
 	logger.Log.Info("[app] All usecases initialized")
 
@@ -136,6 +139,7 @@ func Init(router *gin.Engine) (*Workers, error) {
 		AuthUseCase:         authUseCase,
 		BookingUseCase:      bookingUseCase,
 		NotificationUseCase: notificationUseCase,
+		BlacklistService:    blacklistService,
 		RateLimiter:         rateLimiter,
 	})
 	logger.Log.Info("[app] Router is running")

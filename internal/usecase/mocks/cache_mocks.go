@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	redis "github.com/redis/go-redis/v9"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -95,6 +96,35 @@ func (m *MockCache) Get(ctx context.Context, key string, dest any) error {
 func (mr *MockCacheMockRecorder) Get(ctx, key, dest any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCache)(nil).Get), ctx, key, dest)
+}
+
+// GetClient mocks base method.
+func (m *MockCache) GetClient() *redis.Client {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClient")
+	ret0, _ := ret[0].(*redis.Client)
+	return ret0
+}
+
+// GetClient indicates an expected call of GetClient.
+func (mr *MockCacheMockRecorder) GetClient() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClient", reflect.TypeOf((*MockCache)(nil).GetClient))
+}
+
+// IncrementWithTTL mocks base method.
+func (m *MockCache) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrementWithTTL", ctx, key, ttl)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IncrementWithTTL indicates an expected call of IncrementWithTTL.
+func (mr *MockCacheMockRecorder) IncrementWithTTL(ctx, key, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementWithTTL", reflect.TypeOf((*MockCache)(nil).IncrementWithTTL), ctx, key, ttl)
 }
 
 // Set mocks base method.

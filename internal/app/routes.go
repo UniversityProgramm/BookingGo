@@ -20,10 +20,11 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	{
 		authGroup.POST("/login", authController.Login)
 		authGroup.POST("/register", authController.Register)
+		authGroup.POST("/logout", authController.Logout)
 	}
 
 	protectedGroup := api.Group("/me")
-	protectedGroup.Use(auth.AuthMiddleware())
+	protectedGroup.Use(auth.AuthMiddleware(deps.BlacklistService))
 	{
 		profileGroup := protectedGroup.Group("/profile")
 		{
@@ -57,7 +58,7 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 
 	userController := controller.NewUserController(deps.UserUseCase)
 	staffGroup := api.Group("/staffPanel")
-	staffGroup.Use(auth.AuthMiddleware())
+	staffGroup.Use(auth.AuthMiddleware(deps.BlacklistService))
 	staffGroup.Use(auth.StaffOnly())
 	{
 		userStaffGroup := staffGroup.Group("/users")
@@ -75,7 +76,7 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	}
 
 	adminGroup := api.Group("/adminPanel")
-	adminGroup.Use(auth.AuthMiddleware())
+	adminGroup.Use(auth.AuthMiddleware(deps.BlacklistService))
 	adminGroup.Use(auth.AdminOnly())
 	{
 		userAdminGroup := adminGroup.Group("/users")

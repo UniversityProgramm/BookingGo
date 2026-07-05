@@ -35,10 +35,11 @@ type AuthUseCase struct {
 	outboxRepo  OutboxRepository
 	totpService TotpService
 	cache       cache.Cache
+	blacklist   auth.Blacklist
 }
 
-func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService, cache cache.Cache) *AuthUseCase {
-	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService, cache: cache}
+func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService, cache cache.Cache, blacklist auth.Blacklist) *AuthUseCase {
+	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService, cache: cache, blacklist: blacklist}
 }
 
 func (a *AuthUseCase) invalidateUserCache(ctx context.Context, userID int) {
@@ -97,6 +98,15 @@ func (a *AuthUseCase) Register(req *entity.CreateUserRequest) (string, error) {
 	return token, nil
 }
 
+func (a *AuthUseCase) Logout(userID int, jti string, expiresAt time.Time) error {
+	if err := a.blacklist.AddToBlacklist(context.Background(), jti, expiresAt); err != nil {
+		logger.Log.Error("[AuthUseCase] Failed to add token to blacklist", "user_id", userID, "jti", jti, "error", err.Error())
+		return err
+	}
+
+	return nil
+}
+
 func (a *AuthUseCase) GetMe(userID int) (*entity.User, error) {
 	key := fmt.Sprintf("user:%d", userID)
 
@@ -131,8 +141,8 @@ func (a *AuthUseCase) UpdateMe(userID int, req *entity.UpdateUserProfileRequest)
 	return user, nil
 }
 
-func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) error {
-	user, err := a.userUseCase.GetUserByID(id)
+func (a *AuthUseCase) ChangePassword(userID int, req *entity.ChangePasswordRequest) error {
+	user, err := a.userUseCase.GetUserByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -165,6 +175,13 @@ func (a *AuthUseCase) ChangePassword(id int, req *entity.ChangePasswordRequest) 
 		"password_hash": string(newHashPassword),
 	}
 	_, err = a.userUseCase.UpdateUserData(user.ID, updates)
+	if err != nil {
+		return err
+	}
+
+	if err := a.blacklist.InvalidateAllSessions(context.Background(), userID); err != nil {
+		logger.Log.Error("[AuthUseCase] Failed to invalidate sessions", "user_id", userID, "error", err.Error())
+	}
 
 	payload := map[string]any{
 		"user_id":    user.ID,
@@ -216,6 +233,13 @@ func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*
 		"email": req.NewEmail,
 	}
 	updatedUser, err := a.userUseCase.UpdateUserData(user.ID, updates)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.blacklist.InvalidateAllSessions(context.Background(), userID); err != nil {
+		logger.Log.Error("[AuthUseCase] Failed to invalidate sessions", "user_id", userID, "error", err.Error())
+	}
 
 	a.invalidateUserCache(context.Background(), userID)
 

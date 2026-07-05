@@ -2,14 +2,17 @@ package auth
 
 import (
 	"BookingGo/internal/enum"
+	"BookingGo/pkg/logger"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 const ContextKeyUser = "user"
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(blacklist Blacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -19,21 +22,29 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		var tokenString string
-		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-			tokenString = authHeader[7:]
-		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "Неверный формат токена",
-			})
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Неверный формат токена"})
 			return
 		}
 
+		tokenString := parts[1]
+
 		claims, err := ValidateToken(tokenString)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": err.Error(),
-			})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Невалидный токен"})
+			return
+		}
+
+		if blacklist.IsInBlacklist(c.Request.Context(), strconv.Itoa(claims.UserID)) {
+			logger.Log.Warn("[AuthMiddleware] Request with blacklisted token", "user_id", claims.UserID, "jti", claims.ID, "ip", c.ClientIP())
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Токен отозван"})
+			return
+		}
+
+		if !blacklist.IsSessionValid(c.Request.Context(), claims.UserID, claims.IssuedAt.Time) {
+			logger.Log.Warn("[AuthMiddleware] Session invalidated by password/email change", "user_id", claims.UserID, "jti", claims.ID)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Сессия устарела. Войдите заново"})
 			return
 		}
 

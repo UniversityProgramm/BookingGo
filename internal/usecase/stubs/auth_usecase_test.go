@@ -9,6 +9,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type StubUserUseCase struct {
@@ -32,11 +34,20 @@ type StubTotpService struct {
 }
 
 type StubCacheService struct {
-	GetFunc            func(ctx context.Context, key string, dest any) error
-	SetFunc            func(ctx context.Context, key string, value any, ttl time.Duration) error
-	DeleteFunc         func(ctx context.Context, key string) error
-	DeleteByPrefixFunc func(ctx context.Context, prefix string) error
-	CloseFunc          func() error
+	GetFunc              func(ctx context.Context, key string, dest any) error
+	SetFunc              func(ctx context.Context, key string, value any, ttl time.Duration) error
+	DeleteFunc           func(ctx context.Context, key string) error
+	DeleteByPrefixFunc   func(ctx context.Context, prefix string) error
+	IncrementWithTTLFunc func(ctx context.Context, key string, ttl time.Duration) (int64, error)
+	GetClientFunc        func() *redis.Client
+	CloseFunc            func() error
+}
+
+type StubBlacklistService struct {
+	AddToBlacklistFunc        func(ctx context.Context, jti string, expiresAt time.Time) error
+	IsInBlacklistFunc         func(ctx context.Context, jti string) bool
+	InvalidateAllSessionsFunc func(ctx context.Context, userID int) error
+	IsSessionValidFunc        func(ctx context.Context, userID int, issuedAt time.Time) bool
 }
 
 func (m *StubUserUseCase) GetUserByEmail(email string) (*entity.User, error) {
@@ -135,12 +146,26 @@ func (sc StubCacheService) Delete(ctx context.Context, key string) error {
 	if sc.DeleteFunc != nil {
 		return sc.DeleteFunc(ctx, key)
 	}
-	return nil
+	return domain.ErrNotImplemented
 }
 
 func (sc StubCacheService) DeleteByPrefix(ctx context.Context, prefix string) error {
 	if sc.DeleteByPrefixFunc != nil {
 		return sc.DeleteByPrefixFunc(ctx, prefix)
+	}
+	return domain.ErrNotImplemented
+}
+
+func (sc StubCacheService) IncrementWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	if sc.IncrementWithTTLFunc != nil {
+		return sc.IncrementWithTTLFunc(ctx, key, ttl)
+	}
+	return 0, domain.ErrNotImplemented
+}
+
+func (sc StubCacheService) GetClient() *redis.Client {
+	if sc.GetClientFunc != nil {
+		return sc.GetClientFunc()
 	}
 	return nil
 }
@@ -150,6 +175,34 @@ func (sc StubCacheService) Close() error {
 		return sc.CloseFunc()
 	}
 	return nil
+}
+
+func (s *StubBlacklistService) AddToBlacklist(ctx context.Context, jti string, expiresAt time.Time) error {
+	if s.AddToBlacklistFunc != nil {
+		return s.AddToBlacklistFunc(ctx, jti, expiresAt)
+	}
+	return domain.ErrNotImplemented
+}
+
+func (s *StubBlacklistService) IsInBlacklist(ctx context.Context, jti string) bool {
+	if s.IsInBlacklistFunc != nil {
+		return s.IsInBlacklistFunc(ctx, jti)
+	}
+	return false
+}
+
+func (s *StubBlacklistService) InvalidateAllSessions(ctx context.Context, userID int) error {
+	if s.InvalidateAllSessionsFunc != nil {
+		return s.InvalidateAllSessionsFunc(ctx, userID)
+	}
+	return domain.ErrNotImplemented
+}
+
+func (s *StubBlacklistService) IsSessionValid(ctx context.Context, userID int, issuedAt time.Time) bool {
+	if s.IsSessionValidFunc != nil {
+		return s.IsSessionValidFunc(ctx, userID, issuedAt)
+	}
+	return true
 }
 
 var testAuthUser = &entity.User{
@@ -198,13 +251,14 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
 	loginReq := &entity.LoginUserRequest{
 		Email:    "test@example.com",
 		Password: "password123",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	token, err := authUseCase.Login(loginReq)
 
 	if err != nil {
@@ -228,13 +282,14 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
 	loginReq := &entity.LoginUserRequest{
 		Email:    "not_found@example.com",
 		Password: "password123",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.Login(loginReq)
 	if !errors.Is(err, domain.ErrInvalidEmail) {
 		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
@@ -251,13 +306,14 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
 	loginReq := &entity.LoginUserRequest{
 		Email:    "test@example.com",
 		Password: "wrong_password",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.Login(loginReq)
 	if !errors.Is(err, domain.ErrInvalidPassword) {
 		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
@@ -283,8 +339,9 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	token, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "newuser@example.com",
 		Password: "qwerty12345",
@@ -310,8 +367,9 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.Register(&entity.CreateUserRequest{
 		Email:    "taken@example.com",
 		Password: "qwerty123",
@@ -333,8 +391,9 @@ func TestAuthUseCase_GetMe_Success(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -360,8 +419,11 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 			return nil
 		},
 	}
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, &StubOutboxRepository{}, &StubTotpService{}, stubCache)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -393,8 +455,11 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 			return nil
 		},
 	}
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, &StubOutboxRepository{}, &StubTotpService{}, stubCache)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -423,8 +488,11 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 			return errors.New("cache error")
 		},
 	}
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, &StubOutboxRepository{}, &StubTotpService{}, stubCache)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -453,8 +521,11 @@ func TestAuthUseCase_GetMe_UserNotFound_NoCacheSet(t *testing.T) {
 			return nil
 		},
 	}
+	stubNotifier := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, &StubOutboxRepository{}, &StubTotpService{}, stubCache)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	_, err := authUseCase.GetMe(999)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -475,8 +546,9 @@ func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.GetMe(1)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -501,8 +573,9 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 			return nil
 		},
 	}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
 		Phone: new("+79991234567"),
 	})
@@ -525,8 +598,9 @@ func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
 		Phone: new("+79991234567"),
 	})
@@ -537,13 +611,19 @@ func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
+	passwordUpdated := false
 	outboxCalled := false
+	sessionsInvalidated := false
 
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return testAuthUser, nil
 		},
 		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+			passwordUpdated = true
+			if updates["password_hash"] == "" {
+				t.Error("password_hash не был обновлён")
+			}
 			return testAuthUser, nil
 		},
 	}
@@ -559,8 +639,17 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{
+		InvalidateAllSessionsFunc: func(ctx context.Context, userID int) error {
+			sessionsInvalidated = true
+			if userID != testAuthUser.ID {
+				t.Errorf("Expected userID %d, got %d", testAuthUser.ID, userID)
+			}
+			return nil
+		},
+	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "new",
@@ -572,10 +661,17 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	if !outboxCalled {
 		t.Error("Outbox событие должно было быть создано")
 	}
+	if !passwordUpdated {
+		t.Error("Пароль должен быть обновлен")
+	}
+	if !sessionsInvalidated {
+		t.Error("Все сессии должны быть деактивированы")
+	}
 }
 
 func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 	outboxCalled := false
+	sessionsInvalidated := false
 
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
@@ -603,8 +699,13 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService)
+	stubBlacklistService := &StubBlacklistService{
+		InvalidateAllSessionsFunc: func(ctx context.Context, userID int) error {
+			sessionsInvalidated = true
+			return nil
+		},
+	}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newSecurePass!",
@@ -616,6 +717,9 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 	}
 	if !outboxCalled {
 		t.Error("Outbox событие должно было быть создано")
+	}
+	if !sessionsInvalidated {
+		t.Error("Все сессии должны быть деактивированы")
 	}
 }
 
@@ -629,8 +733,9 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "old",
 		NewPassword:     "new",
@@ -651,8 +756,9 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "wrong",
 		NewPassword:     "new",
@@ -673,8 +779,9 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
@@ -694,8 +801,9 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newpass",
@@ -720,8 +828,9 @@ func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newpass",
@@ -736,6 +845,7 @@ func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
 func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	cacheUserInvalidated := false
 	outboxCalled := false
+	sessionsInvalidated := false
 
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
@@ -772,8 +882,17 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 			return nil
 		},
 	}
+	stubBlacklistService := &StubBlacklistService{
+		InvalidateAllSessionsFunc: func(ctx context.Context, userID int) error {
+			sessionsInvalidated = true
+			if userID != testAuthUser.ID {
+				t.Errorf("Expected userID %d, got %d", testAuthUser.ID, userID)
+			}
+			return nil
+		},
+	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
 	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
@@ -792,9 +911,14 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	if !outboxCalled {
 		t.Error("Outbox событие должно было быть создано")
 	}
+	if !sessionsInvalidated {
+		t.Error("Все сессии должны быть деактивированы")
+	}
 }
 
 func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
+	sessionsInvalidated := false
+
 	stubUserUseCase := &StubUserUseCase{
 		GetUserByIDFunc: func(id int) (*entity.User, error) {
 			return userWithTotp, nil
@@ -828,8 +952,16 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
-
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	stubBlacklistService := &StubBlacklistService{
+		InvalidateAllSessionsFunc: func(ctx context.Context, userID int) error {
+			sessionsInvalidated = true
+			if userID != testAuthUser.ID {
+				t.Errorf("Expected userID %d, got %d", testAuthUser.ID, userID)
+			}
+			return nil
+		},
+	}
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
@@ -841,6 +973,9 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 	}
 	if updatedUser.Email != "new@example.com" {
 		t.Errorf("Email не обновился: ожидался 'new@example.com', получен '%s'", updatedUser.Email)
+	}
+	if !sessionsInvalidated {
+		t.Error("Все сессии должны быть деактивированы")
 	}
 }
 
@@ -854,8 +989,9 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		ConfirmPassword: "old",
 		NewEmail:        "newemail@example.com",
@@ -880,8 +1016,9 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		ConfirmPassword: "wrong",
 		NewEmail:        "newemail@example.com",
@@ -906,8 +1043,9 @@ func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
 	stubNotifier := &StubOutboxRepository{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		ConfirmPassword: "password123",
 		NewEmail:        "newemail@example.com",
@@ -930,8 +1068,9 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
@@ -968,8 +1107,9 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	otpURL, err := authUseCase.SetupTotp(1)
 
 	if err != nil {
@@ -989,8 +1129,9 @@ func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.SetupTotp(999)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -1007,8 +1148,9 @@ func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.SetupTotp(1)
 
 	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
@@ -1047,8 +1189,9 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 			return nil
 		},
 	}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
 
 	if err != nil {
@@ -1068,8 +1211,9 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.VerifyTotp(999, &entity.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -1086,8 +1230,9 @@ func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
@@ -1109,8 +1254,9 @@ func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrTotpSecretNotSet) {
@@ -1136,8 +1282,9 @@ func TestAuthUseCase_VerifyTotp_InvalidCode(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "wrongcode"})
 
 	if !errors.Is(err, domain.ErrInvalidTotpCode) {
@@ -1171,8 +1318,9 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 			return nil
 		},
 	}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
 		CurrentPassword: "password123",
 		OtpCode:         "123456",
@@ -1195,8 +1343,9 @@ func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.DisableTotp(999, &entity.DisableTotpRequest{
 		CurrentPassword: "pass",
 		OtpCode:         "123456",
@@ -1220,8 +1369,9 @@ func TestAuthUseCase_DisableTotp_NotEnabled(t *testing.T) {
 	stubOutbox := &StubOutboxRepository{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
 		CurrentPassword: "pass",
 		OtpCode:         "123456",
@@ -1245,8 +1395,9 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
 		CurrentPassword: "password123",
 		OtpCode:         "wrongcode",
@@ -1270,8 +1421,9 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 		},
 	}
 	stubCacheService := &StubCacheService{}
+	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService)
+	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
 		CurrentPassword: "wrongpass",
 		OtpCode:         "123456",
@@ -1279,5 +1431,84 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrCurPasswordIsNotCorrect) {
 		t.Errorf("Ожидалась ошибка ErrCurPasswordIsNotCorrect, получена: %v", err)
+	}
+}
+
+func TestAuthUseCase_Logout_Success(t *testing.T) {
+	blacklistCalled := false
+	var receivedJTI string
+	var receivedExpiresAt time.Time
+
+	stubBlacklist := &StubBlacklistService{
+		AddToBlacklistFunc: func(ctx context.Context, jti string, expiresAt time.Time) error {
+			blacklistCalled = true
+			receivedJTI = jti
+			receivedExpiresAt = expiresAt
+			return nil
+		},
+	}
+
+	stubUserUseCase := &StubUserUseCase{}
+	stubOutboxRepo := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewAuthUseCase(
+		stubUserUseCase,
+		stubOutboxRepo,
+		stubTotpService,
+		stubCacheService,
+		stubBlacklist,
+	)
+
+	userID := 1
+	jti := "test-jti-123"
+	expiresAt := time.Now().Add(1 * time.Hour)
+
+	err := useCase.Logout(userID, jti, expiresAt)
+
+	if err != nil {
+		t.Fatalf("Expected success, got error: %v", err)
+	}
+	if !blacklistCalled {
+		t.Error("AddToBlacklist should be called")
+	}
+	if receivedJTI != jti {
+		t.Errorf("Expected JTI %s, got %s", jti, receivedJTI)
+	}
+	if receivedExpiresAt.Sub(expiresAt) > time.Second || receivedExpiresAt.Sub(expiresAt) < -time.Second {
+		t.Errorf("Expected expiresAt %v, got %v", expiresAt, receivedExpiresAt)
+	}
+}
+
+func TestAuthUseCase_Logout_BlacklistError(t *testing.T) {
+	blacklistError := errors.New("redis connection failed")
+
+	stubBlacklist := &StubBlacklistService{
+		AddToBlacklistFunc: func(ctx context.Context, jti string, expiresAt time.Time) error {
+			return blacklistError
+		},
+	}
+
+	stubUserUseCase := &StubUserUseCase{}
+	stubOutboxRepo := &StubOutboxRepository{}
+	stubTotpService := &StubTotpService{}
+	stubCacheService := &StubCacheService{}
+
+	useCase := usecase.NewAuthUseCase(
+		stubUserUseCase,
+		stubOutboxRepo,
+		stubTotpService,
+		stubCacheService,
+		stubBlacklist,
+	)
+
+	err := useCase.Logout(1, "test-jti", time.Now().Add(1*time.Hour))
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+	if !errors.Is(err, blacklistError) {
+		t.Errorf("Expected blacklist error, got: %v", err)
 	}
 }

@@ -52,6 +52,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByEmail(testAuthUser.Email).
@@ -61,7 +62,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.LoginUserRequest{
 		Email:    testAuthUser.Email,
@@ -85,12 +86,13 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByEmail("not_exist@example.com").
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.LoginUserRequest{
 		Email:    "not_exist@example.com",
@@ -112,12 +114,13 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByEmail(testAuthUser.Email).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.LoginUserRequest{
 		Email:    testAuthUser.Email,
@@ -139,6 +142,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	newUser := &entity.User{
 		ID:    10,
@@ -152,7 +156,7 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 		})).
 		Return(newUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.CreateUserRequest{
 		Email:    "new@example.com",
@@ -178,6 +182,7 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		CreateUser(gomock.Cond(func(req *entity.CreateUserRequest) bool {
@@ -185,7 +190,7 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 		})).
 		Return(nil, domain.ErrEmailTaken)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.CreateUserRequest{
 		Email:    "taken@example.com",
@@ -208,6 +213,7 @@ func TestAuthUseCase_GetMe_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -221,7 +227,7 @@ func TestAuthUseCase_GetMe_Success(t *testing.T) {
 		Set(gomock.Any(), gomock.Any(), gomock.Any(), 300*time.Second).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	user, err := useCase.GetMe(testAuthUser.ID)
 
@@ -241,6 +247,7 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	dbCalled := false
 
@@ -261,7 +268,7 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 		}).
 		MaxTimes(0)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	user, err := useCase.GetMe(testAuthUser.ID)
 
@@ -284,6 +291,7 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	cacheSetCalled := false
 
@@ -302,7 +310,7 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 			return nil
 		})
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	user, err := useCase.GetMe(testAuthUser.ID)
 
@@ -325,6 +333,7 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -338,7 +347,7 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 		Set(gomock.Any(), gomock.Any(), gomock.Any(), 300*time.Second).
 		Return(errors.New("cache error"))
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	user, err := useCase.GetMe(testAuthUser.ID)
 
@@ -358,6 +367,7 @@ func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -367,7 +377,7 @@ func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
 		GetUserByID(testAuthUser.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	_, err := useCase.GetMe(testAuthUser.ID)
 
@@ -384,6 +394,7 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
 	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
@@ -399,7 +410,7 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	user, err := useCase.UpdateMe(testAuthUser.ID, req)
 
@@ -419,6 +430,7 @@ func TestAuthUseCase_UpdateMe_CacheInvalidation(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
 	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
@@ -434,7 +446,7 @@ func TestAuthUseCase_UpdateMe_CacheInvalidation(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	_, err := useCase.UpdateMe(testAuthUser.ID, req)
 
@@ -451,6 +463,7 @@ func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
 	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
@@ -462,7 +475,7 @@ func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
 		UpdateUserProfile(testAuthUser.ID, req).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	_, err := useCase.UpdateMe(testAuthUser.ID, req)
 
@@ -479,6 +492,7 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -498,7 +512,11 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	blacklistService.EXPECT().
+		InvalidateAllSessions(context.Background(), gomock.Any()).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -520,12 +538,13 @@ func TestAuthUseCase_ChangePassword_WrongCurrentPassword(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "wong_pass",
@@ -547,12 +566,13 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -574,12 +594,13 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -601,6 +622,7 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -618,7 +640,11 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	blacklistService.EXPECT().
+		InvalidateAllSessions(context.Background(), gomock.Any()).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -641,12 +667,13 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
 		Return(userWithTotp, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -669,6 +696,7 @@ func TestAuthUseCase_ChangePassword_InvalidCode(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -678,7 +706,7 @@ func TestAuthUseCase_ChangePassword_InvalidCode(t *testing.T) {
 		ValidateCode(userWithTotp.TotpSecret, "000000").
 		Return(false)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangePasswordRequest{
 		CurrentPassword: "password123",
@@ -701,6 +729,7 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -722,7 +751,11 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	blacklistService.EXPECT().
+		InvalidateAllSessions(context.Background(), gomock.Any()).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
@@ -747,6 +780,7 @@ func TestAuthUseCase_ChangeEmail_CacheInvalidation(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -768,7 +802,11 @@ func TestAuthUseCase_ChangeEmail_CacheInvalidation(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	blacklistService.EXPECT().
+		InvalidateAllSessions(context.Background(), gomock.Any()).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
@@ -790,6 +828,7 @@ func TestAuthUseCase_ChangeEmail_EmailTaken(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -799,7 +838,7 @@ func TestAuthUseCase_ChangeEmail_EmailTaken(t *testing.T) {
 		EmailExists("taken@example.com").
 		Return(true, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "taken@example.com",
@@ -821,6 +860,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -830,7 +870,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 		EmailExists("new@example.com").
 		Return(false, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
@@ -852,12 +892,13 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "taken@example.com",
@@ -879,6 +920,7 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -904,7 +946,11 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 		CreateEvent(gomock.Any()).
 		Return(nil).AnyTimes()
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	blacklistService.EXPECT().
+		InvalidateAllSessions(context.Background(), gomock.Any()).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
@@ -930,6 +976,7 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -939,7 +986,7 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 		EmailExists("newemail@example.com").
 		Return(false, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
@@ -962,6 +1009,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCode(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -975,7 +1023,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCode(t *testing.T) {
 		ValidateCode(userWithTotp.TotpSecret, "000000").
 		Return(false)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
@@ -998,6 +1046,7 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
@@ -1013,7 +1062,7 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 		})).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	otpUrl, err := useCase.SetupTotp(testAuthUser.ID)
 
@@ -1033,12 +1082,13 @@ func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	_, err := useCase.SetupTotp(testAuthUser.ID)
 
@@ -1055,12 +1105,13 @@ func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
 		Return(userWithTotp, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	_, err := useCase.SetupTotp(userWithTotp.ID)
 
@@ -1077,6 +1128,7 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithSecret.ID).
@@ -1095,7 +1147,7 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{
 		OtpCode: "123456",
@@ -1116,6 +1168,7 @@ func TestAuthUseCase_VerifyTotp_CacheInvalidation(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithSecret.ID).
@@ -1133,7 +1186,7 @@ func TestAuthUseCase_VerifyTotp_CacheInvalidation(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{OtpCode: "123456"}
 	err := useCase.VerifyTotp(userWithSecret.ID, req)
@@ -1151,12 +1204,13 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithSecret.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{
 		OtpCode: "123456",
@@ -1177,12 +1231,13 @@ func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
 		Return(userWithTotp, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{
 		OtpCode: "123456",
@@ -1203,12 +1258,13 @@ func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{
 		OtpCode: "123456",
@@ -1229,6 +1285,7 @@ func TestAuthUseCase_VerifyTotp_InvalidOtpCode(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithSecret.ID).
@@ -1238,7 +1295,7 @@ func TestAuthUseCase_VerifyTotp_InvalidOtpCode(t *testing.T) {
 		ValidateCode(userWithSecret.TotpSecret, "123456").
 		Return(false)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.VerifyTotpRequest{
 		OtpCode: "123456",
@@ -1259,6 +1316,7 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -1278,7 +1336,7 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "123456",
@@ -1300,6 +1358,7 @@ func TestAuthUseCase_DisableTotp_CacheInvalidation(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -1317,7 +1376,7 @@ func TestAuthUseCase_DisableTotp_CacheInvalidation(t *testing.T) {
 		Delete(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "123456",
@@ -1339,12 +1398,13 @@ func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
 		Return(nil, domain.ErrUserNotFound)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "123456",
@@ -1366,12 +1426,13 @@ func TestAuthUseCase_DisableTotp_AlreadyDisabled(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(testAuthUser.ID).
 		Return(testAuthUser, nil)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "123456",
@@ -1393,6 +1454,7 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -1402,7 +1464,7 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 		ValidateCode(userWithTotp.TotpSecret, "123456").
 		Return(true)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "123456",
@@ -1424,6 +1486,7 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 	mockOutboxRepo := NewMockOutboxRepository(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
+	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(userWithTotp.ID).
@@ -1433,7 +1496,7 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 		ValidateCode(userWithTotp.TotpSecret, "000000").
 		Return(false)
 
-	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache)
+	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
 	req := &entity.DisableTotpRequest{
 		OtpCode:         "000000",
@@ -1444,5 +1507,61 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrInvalidTotpCode) {
 		t.Errorf("Expected ErrInvalidTotpCode, got error: %v", err)
+	}
+}
+
+func TestAuthUseCase_Logout_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
+	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockTotpService := NewMockTotpService(ctrl)
+	mockCache := NewMockCache(ctrl)
+	mockBlacklist := NewMockBlacklist(ctrl)
+
+	jti := "test-jti-123"
+	expiresAt := time.Now().Add(1 * time.Hour)
+
+	mockBlacklist.EXPECT().
+		AddToBlacklist(gomock.Any(), jti, expiresAt).
+		Return(nil)
+
+	useCase := usecase.NewAuthUseCase(
+		mockUserUseCase,
+		mockOutboxRepo,
+		mockTotpService,
+		mockCache,
+		mockBlacklist,
+	)
+
+	err := useCase.Logout(1, jti, expiresAt)
+
+	if err != nil {
+		t.Fatalf("Expected success, got error: %v", err)
+	}
+}
+
+func TestAuthUseCase_Logout_BlacklistError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBlacklist := NewMockBlacklist(ctrl)
+
+	blacklistError := errors.New("redis connection failed")
+
+	mockBlacklist.EXPECT().
+		AddToBlacklist(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(blacklistError)
+
+	useCase := usecase.NewAuthUseCase(nil, nil, nil, nil, mockBlacklist)
+
+	err := useCase.Logout(1, "test-jti", time.Now().Add(1*time.Hour))
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+	if !errors.Is(err, blacklistError) {
+		t.Errorf("Expected blacklist error, got: %v", err)
 	}
 }
