@@ -6,4 +6,4 @@ tmp/
 bin/
 .env
 docker-compose.override.yml
-docker_commands.txt
+terminal_commands.txt

@@ -22,6 +22,18 @@ func NewUserController(userUseCase *usecase.UserUseCase) *UserController {
 	return &UserController{userUseCase: userUseCase}
 }
 
+// GetAllUsers godoc
+// @Summary      Получить всех пользователей
+// @Description  Возвращает список всех пользователей. Доступно staff и admin.
+// @Tags         management
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   entity.User              "Список пользователей"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /staffPanel/users [get]
+// @Router       /adminPanel/users [get]
 func (u UserController) GetAllUsers(c *gin.Context) {
 	users, err := u.userUseCase.GetAllUsers()
 	if err != nil {
@@ -34,6 +46,20 @@ func (u UserController) GetAllUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
+// GetUserByID godoc
+// @Summary      Получить пользователя по ID
+// @Description  Возвращает данные пользователя по его ID
+// @Tags         management
+// @Security     BearerAuth
+// @Param        id  path      int  true  "ID пользователя"
+// @Success      200  {object}  entity.User              "Данные пользователя"
+// @Failure      400  {object}  map[string]string        "ID должен быть числом"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      404  {object}  map[string]string        "Пользователь не найден"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /staffPanel/users/{id} [get]
+// @Router       /adminPanel/users/{id} [get]
 func (u UserController) GetUserByID(c *gin.Context) {
 	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -60,6 +86,19 @@ func (u UserController) GetUserByID(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// GetUserByEmail godoc
+// @Summary      Найти пользователя по email
+// @Description  Возвращает данные пользователя по email
+// @Tags         management
+// @Security     BearerAuth
+// @Param        email  path      string  true  "Email пользователя"
+// @Success      200  {object}  entity.User              "Данные пользователя"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      404  {object}  map[string]string        "Пользователь не найден"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /staffPanel/users/email/{email} [get]
+// @Router       /adminPanel/users/email/{email} [get]
 func (u UserController) GetUserByEmail(c *gin.Context) {
 	user, err := u.userUseCase.GetUserByEmail(c.Param("email"))
 	if err != nil {
@@ -78,6 +117,20 @@ func (u UserController) GetUserByEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// CreateUser godoc
+// @Summary      Создать пользователя (admin)
+// @Description  Создаёт нового пользователя с указанной ролью. Только для администраторов.
+// @Tags         management
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      entity.CreateUserRequest  true  "Данные пользователя"
+// @Success      201      {object}  entity.User               "Созданный пользователь"
+// @Failure      400      {object}  map[string]string         "Неверный формат"
+// @Failure      401      {object}  map[string]string         "Требуется авторизация"
+// @Failure      403      {object}  map[string]string         "Доступ запрещён"
+// @Failure      500      {object}  map[string]string         "Внутренняя ошибка сервера"
+// @Router       /adminPanel/users [post]
 func (u UserController) CreateUser(c *gin.Context) {
 	var createRequest entity.CreateUserRequest
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
@@ -98,6 +151,23 @@ func (u UserController) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
+// UpdateUser godoc
+// @Summary      Обновить пользователя (admin)
+// @Description  Обновляет данные пользователя по ID. Только для администраторов.
+// @Tags         management
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path      int                          true  "ID пользователя"
+// @Param        request  body      entity.UpdateUserProfileRequest  true  "Данные для обновления"
+// @Success      200  {object}  entity.User              "Обновлённый пользователь"
+// @Failure      400  {object}  map[string]string        "Неверный формат / ID должен быть числом"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      404  {object}  map[string]string        "Пользователь не найден"
+// @Failure      409  {object}  map[string]string        "Email уже занят"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /adminPanel/users/{id} [put]
 func (u UserController) UpdateUser(c *gin.Context) {
 	userId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -134,6 +204,19 @@ func (u UserController) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedUser)
 }
 
+// DeleteUser godoc
+// @Summary      Удалить пользователя (admin)
+// @Description  Удаляет пользователя по ID. Только для администраторов.
+// @Tags         management
+// @Security     BearerAuth
+// @Param        id  path      int  true  "ID пользователя"
+// @Success      204  {object}  nil                    "Пользователь удалён"
+// @Failure      400  {object}  map[string]string      "ID должен быть числом"
+// @Failure      401  {object}  map[string]string      "Требуется авторизация"
+// @Failure      403  {object}  map[string]string      "Доступ запрещён"
+// @Failure      404  {object}  map[string]string      "Пользователь не найден"
+// @Failure      500  {object}  map[string]string      "Внутренняя ошибка сервера"
+// @Router       /adminPanel/users/{id} [delete]
 func (u UserController) DeleteUser(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {

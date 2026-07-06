@@ -19,6 +19,16 @@ func NewNotificationController(notificationUseCase *usecase.NotificationUseCase)
 	return &NotificationController{notificationUseCase: notificationUseCase}
 }
 
+// GetMyNotifications godoc
+// @Summary      Получить уведомления
+// @Description  Возвращает список уведомлений текущего пользователя и помечает их как прочитанные
+// @Tags         notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   entity.Notification      "Список уведомлений"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /me/notifications [get]
 func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
@@ -53,6 +63,20 @@ func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, notifications)
 }
 
+// UpdateNotificationSettings godoc
+// @Summary      Обновить настройки уведомлений
+// @Description  Включает/отключает email и SMS уведомления
+// @Tags         notifications
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      entity.NotificationSettings  true  "Настройки уведомлений"
+// @Success      200  {object}  map[string]interface{}  "Настройки обновлены"
+// @Failure      400  {object}  map[string]string       "Неверный формат"
+// @Failure      401  {object}  map[string]string       "Требуется авторизация"
+// @Failure      404  {object}  map[string]string       "Пользователь не найден"
+// @Failure      500  {object}  map[string]string       "Внутренняя ошибка сервера"
+// @Router       /me/notifications/settings [patch]
 func (nc *NotificationController) UpdateNotificationSettings(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {

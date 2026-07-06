@@ -85,3 +85,4 @@ docker-compose up --build -d
 
 # Откройте Swagger UI
 open http://localhost:8080/swagger/index.html
+```

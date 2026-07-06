@@ -13,8 +13,40 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+
+	_ "BookingGo/docs"
 )
 
+// @title           BookingGo API
+// @version         1.0
+// @description     API для сервиса бронирований с поддержкой 2FA, уведомлений и Outbox
+// @description
+// @description     ## Возможности:
+// @description     - Регистрация и авторизация пользователей
+// @description     - Двухфакторная аутентификация (TOTP)
+// @description     - Создание и управление бронированиями
+// @description     - Система уведомлений (email, SMS, web)
+// @description     - Роли: client, staff, admin
+// @description     - Кэширование через Redis
+// @description     - Паттерн Outbox для надёжной доставки уведомлений
+//
+// @termsOfService  http://swagger.io/terms/
+//
+// @contact.name   API Support
+// @contact.url    https://github.com/UniversityProgramm/BookingGo
+//
+// @host      localhost:8080
+// @BasePath  /api
+//
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Введите токен в формате: `Bearer <your_token>`
+//
+// @securityDefinitions.apikey  CookieAuth
+// @in                          cookie
+// @name                        token
+// @description                 Альтернативная аутентификация через cookie
 func main() {
 	_ = godotenv.Load()
 

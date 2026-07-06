@@ -107,6 +107,7 @@ func Init(router *gin.Engine) (*Workers, error) {
 	}
 	logger.Log.Info("[app] Outbox worker is running")
 
+	var bookingWorker *worker.ExternalBookingWorker
 	err = natsClient.Init()
 	if err != nil {
 		switch {
@@ -119,20 +120,22 @@ func Init(router *gin.Engine) (*Workers, error) {
 		case errors.Is(err, domain.ErrStreamAlreadyExists):
 			logger.Log.Debug("[app] Stream already exists, skipping creation", "stream_name", "BOOKING")
 		default:
-			return nil, fmt.Errorf("failed to init NATS: %w", err)
+			logger.Log.Error("[app] Failed to init NATS", "error", err.Error())
 		}
-	}
-	logger.Log.Info("[app] NATS stream created successfully",
-		"stream_name", "BOOKINGS",
-		"subjects", []string{"booking.external.create"},
-		"storage", "file",
-	)
+	} else {
+		logger.Log.Info("[app] NATS stream created successfully",
+			"stream_name", "BOOKINGS",
+			"subjects", []string{"booking.external.create"},
+			"storage", "file",
+		)
 
-	bookingWorker := worker.NewExternalBookingWorker(bookingUseCase, userUseCase)
-	if err := bookingWorker.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start external booking worker: %w", err)
+		bookingWorker := worker.NewExternalBookingWorker(bookingUseCase, userUseCase)
+		if err := bookingWorker.Start(); err != nil {
+			logger.Log.Error("[app] Failed to start external booking worker", "error", err.Error())
+		}
+		logger.Log.Info("[app] External booking worker is running")
+
 	}
-	logger.Log.Info("[app] External booking worker is running")
 
 	SetupRoutes(router, &Dependencies{
 		UserUseCase:         userUseCase,

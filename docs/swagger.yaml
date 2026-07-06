@@ -1,0 +1,1401 @@
+basePath: /api
+definitions:
+  BookingGo_internal_entity.Booking:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      problem_description:
+        type: string
+      slot_end:
+        type: string
+      slot_start:
+        type: string
+      status:
+        $ref: '#/definitions/BookingGo_internal_enum.BookingStatus'
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  BookingGo_internal_entity.ChangeEmailRequest:
+    properties:
+      confirm_password:
+        type: string
+      new_email:
+        type: string
+      otp_code:
+        type: string
+    required:
+    - confirm_password
+    - new_email
+    - otp_code
+    type: object
+  BookingGo_internal_entity.ChangePasswordRequest:
+    properties:
+      cur_password:
+        type: string
+      new_password:
+        maxLength: 20
+        minLength: 8
+        type: string
+      otp_code:
+        type: string
+    required:
+    - cur_password
+    - new_password
+    - otp_code
+    type: object
+  BookingGo_internal_entity.CreateBookingRequest:
+    properties:
+      problem_description:
+        type: string
+      slot_start:
+        type: string
+    required:
+    - slot_start
+    type: object
+  BookingGo_internal_entity.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      fio:
+        type: string
+      password:
+        maxLength: 20
+        minLength: 8
+        type: string
+      phone:
+        maxLength: 15
+        minLength: 10
+        type: string
+    required:
+    - email
+    - fio
+    - password
+    - phone
+    type: object
+  BookingGo_internal_entity.DisableTotpRequest:
+    properties:
+      confirm_password:
+        type: string
+      otp_code:
+        type: string
+    required:
+    - confirm_password
+    - otp_code
+    type: object
+  BookingGo_internal_entity.LoginUserRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 20
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  BookingGo_internal_entity.Notification:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_read:
+        type: boolean
+      title:
+        type: string
+    type: object
+  BookingGo_internal_entity.NotificationSettings:
+    properties:
+      is_email:
+        type: boolean
+      is_sms:
+        type: boolean
+    type: object
+  BookingGo_internal_entity.UpdateUserProfileRequest:
+    properties:
+      fio:
+        type: string
+      phone:
+        type: string
+    type: object
+  BookingGo_internal_entity.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      fio:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      is_totp_enabled:
+        type: boolean
+      notification_settings:
+        $ref: '#/definitions/BookingGo_internal_entity.NotificationSettings'
+      phone:
+        type: string
+      role:
+        $ref: '#/definitions/BookingGo_internal_enum.Role'
+      updated_at:
+        type: string
+    type: object
+  BookingGo_internal_entity.VerifyTotpRequest:
+    properties:
+      otp_code:
+        type: string
+    required:
+    - otp_code
+    type: object
+  BookingGo_internal_enum.BookingStatus:
+    enum:
+    - confirmed
+    - cancelled
+    - completed
+    type: string
+    x-enum-varnames:
+    - StatusConfirmed
+    - StatusCancelled
+    - StatusCompleted
+  BookingGo_internal_enum.Role:
+    enum:
+    - client
+    - staff
+    - admin
+    type: string
+    x-enum-varnames:
+    - RoleClient
+    - RoleStaff
+    - RoleAdmin
+host: localhost:8080
+info:
+  contact:
+    name: API Support
+    url: https://github.com/UniversityProgramm/BookingGo
+  description: |-
+    API для сервиса бронирований с поддержкой 2FA, уведомлений и Outbox
+
+    ## Возможности:
+    - Регистрация и авторизация пользователей
+    - Двухфакторная аутентификация (TOTP)
+    - Создание и управление бронированиями
+    - Система уведомлений (email, SMS, web)
+    - Роли: client, staff, admin
+    - Кэширование через Redis
+    - Паттерн Outbox для надёжной доставки уведомлений
+  termsOfService: http://swagger.io/terms/
+  title: BookingGo API
+  version: "1.0"
+paths:
+  /adminPanel/bookings:
+    get:
+      description: Возвращает список всех бронирований в системе. Доступно только
+        staff и admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список всех бронирований
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.Booking'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить все бронирования
+      tags:
+      - management
+  /adminPanel/users:
+    get:
+      description: Возвращает список всех пользователей. Доступно staff и admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список пользователей
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.User'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить всех пользователей
+      tags:
+      - management
+    post:
+      consumes:
+      - application/json
+      description: Создаёт нового пользователя с указанной ролью. Только для администраторов.
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Созданный пользователь
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "400":
+          description: Неверный формат
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создать пользователя (admin)
+      tags:
+      - management
+  /adminPanel/users/{id}:
+    delete:
+      description: Удаляет пользователя по ID. Только для администраторов.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Пользователь удалён
+        "400":
+          description: ID должен быть числом
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удалить пользователя (admin)
+      tags:
+      - management
+    get:
+      description: Возвращает данные пользователя по его ID
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Данные пользователя
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "400":
+          description: ID должен быть числом
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить пользователя по ID
+      tags:
+      - management
+    put:
+      consumes:
+      - application/json
+      description: Обновляет данные пользователя по ID. Только для администраторов.
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.UpdateUserProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Обновлённый пользователь
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "400":
+          description: Неверный формат / ID должен быть числом
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Email уже занят
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить пользователя (admin)
+      tags:
+      - management
+  /adminPanel/users/email/{email}:
+    get:
+      description: Возвращает данные пользователя по email
+      parameters:
+      - description: Email пользователя
+        in: path
+        name: email
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Данные пользователя
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Найти пользователя по email
+      tags:
+      - management
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Аутентификация пользователя по email и паролю. Возвращает JWT токен
+        для дальнейших запросов.
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.LoginUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Неверный формат данных
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Неверный email или пароль
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Вход в систему
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Отзыв текущего JWT токена (добавление в blacklist). Требует авторизации.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Сообщение об успешном выходе
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка при выходе
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Выход из системы
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт нового пользователя с ролью client. Возвращает JWT токен.
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: JWT токен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Неверный формат или email занят
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация нового пользователя
+      tags:
+      - auth
+  /me/bookings:
+    get:
+      description: Возвращает список всех бронирований текущего пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список бронирований
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.Booking'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить мои бронирования
+      tags:
+      - bookings
+    post:
+      consumes:
+      - application/json
+      description: Создаёт новое бронирование на указанный слот (1 час). Автоматически
+        отправляет уведомление.
+      parameters:
+      - description: Данные бронирования
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.CreateBookingRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Созданное бронирование
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.Booking'
+        "400":
+          description: Неверный формат / время в прошлом / слот занят
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создать бронирование
+      tags:
+      - bookings
+  /me/bookings/cancelBooking/{id}:
+    post:
+      description: Отменяет бронирование, если оно ещё не началось
+      parameters:
+      - description: ID бронирования
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Бронирование отменено
+        "400":
+          description: ID должен быть числом / бронирование уже активно
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Бронирование не найдено
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Отменить бронирование
+      tags:
+      - bookings
+  /me/notifications:
+    get:
+      description: Возвращает список уведомлений текущего пользователя и помечает
+        их как прочитанные
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список уведомлений
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.Notification'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить уведомления
+      tags:
+      - notifications
+  /me/notifications/settings:
+    patch:
+      consumes:
+      - application/json
+      description: Включает/отключает email и SMS уведомления
+      parameters:
+      - description: Настройки уведомлений
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.NotificationSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Настройки обновлены
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Неверный формат
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить настройки уведомлений
+      tags:
+      - notifications
+  /me/otp/disable:
+    post:
+      consumes:
+      - application/json
+      description: Отключает двухфакторную аутентификацию. Требует код TOTP и текущий
+        пароль.
+      parameters:
+      - description: Код TOTP и пароль
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.DisableTotpRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 2FA отключён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Неверный код / пароль
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 2FA уже отключён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "412":
+          description: Сначала настройте 2FA
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Отключить 2FA
+      tags:
+      - totp
+  /me/otp/setup:
+    post:
+      description: Генерирует секрет TOTP и возвращает otpauth URL для сканирования
+        в приложении-аутентификаторе (Google Authenticator, Authy и т.д.)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OTP URL для настройки
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 2FA уже включён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Настроить 2FA
+      tags:
+      - totp
+  /me/otp/verify:
+    post:
+      consumes:
+      - application/json
+      description: Подтверждает код TOTP и включает двухфакторную аутентификацию
+      parameters:
+      - description: Код TOTP
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.VerifyTotpRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 2FA успешно включён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Неверный код
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 2FA уже подтвержден и включен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "412":
+          description: Сначала настройте 2FA
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Подтвердить 2FA
+      tags:
+      - totp
+  /me/profile:
+    get:
+      description: Возвращает данные авторизованного пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Данные пользователя
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить текущий профиль
+      tags:
+      - profile
+    put:
+      consumes:
+      - application/json
+      description: Обновляет ФИО и телефон пользователя
+      parameters:
+      - description: Данные для обновления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.UpdateUserProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Обновлённый пользователь
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "400":
+          description: Неверный формат
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Email уже занят
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновить профиль
+      tags:
+      - profile
+  /me/profile/email:
+    put:
+      consumes:
+      - application/json
+      description: Изменяет email пользователя. Требует подтверждения пароля и кода
+        TOTP (если 2FA включён).
+      parameters:
+      - description: Новый email и подтверждение
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.ChangeEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пользователь с новым email
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Неверный пароль / неверный TOTP
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Email уже занят
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сменить email
+      tags:
+      - profile
+  /me/profile/password:
+    put:
+      consumes:
+      - application/json
+      description: Изменяет пароль пользователя. Требует подтверждения текущего пароля
+        и кода TOTP (если 2FA включён).
+      parameters:
+      - description: Текущий и новый пароль
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/BookingGo_internal_entity.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Пароль успешно изменён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Неверный текущий пароль / новый пароль совпадает / неверный
+            TOTP
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сменить пароль
+      tags:
+      - profile
+  /staffPanel/bookings:
+    get:
+      description: Возвращает список всех бронирований в системе. Доступно только
+        staff и admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список всех бронирований
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.Booking'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить все бронирования
+      tags:
+      - management
+  /staffPanel/bookings/completeBooking/{id}:
+    post:
+      description: Помечает бронирование как завершённое. Доступно только staff.
+      parameters:
+      - description: ID бронирования
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Обновлённое бронирование
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.Booking'
+        "400":
+          description: ID должен быть числом / бронирование ещё не завершено
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Бронирование не найдено
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Завершить бронирование
+      tags:
+      - management
+  /staffPanel/users:
+    get:
+      description: Возвращает список всех пользователей. Доступно staff и admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список пользователей
+          schema:
+            items:
+              $ref: '#/definitions/BookingGo_internal_entity.User'
+            type: array
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить всех пользователей
+      tags:
+      - management
+  /staffPanel/users/{id}:
+    get:
+      description: Возвращает данные пользователя по его ID
+      parameters:
+      - description: ID пользователя
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Данные пользователя
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "400":
+          description: ID должен быть числом
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить пользователя по ID
+      tags:
+      - management
+  /staffPanel/users/email/{email}:
+    get:
+      description: Возвращает данные пользователя по email
+      parameters:
+      - description: Email пользователя
+        in: path
+        name: email
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Данные пользователя
+          schema:
+            $ref: '#/definitions/BookingGo_internal_entity.User'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Доступ запрещён
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Найти пользователя по email
+      tags:
+      - management
+securityDefinitions:
+  BearerAuth:
+    description: 'Введите токен в формате: `Bearer <your_token>`'
+    in: header
+    name: Authorization
+    type: apiKey
+  CookieAuth:
+    description: Альтернативная аутентификация через cookie
+    in: cookie
+    name: token
+    type: apiKey
+swagger: "2.0"

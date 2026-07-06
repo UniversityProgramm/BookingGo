@@ -20,6 +20,19 @@ func NewBookingController(bookingUseCase *usecase.BookingUseCase) *BookingContro
 	return &BookingController{bookingUseCase: bookingUseCase}
 }
 
+// CreateBooking godoc
+// @Summary      Создать бронирование
+// @Description  Создаёт новое бронирование на указанный слот (1 час). Автоматически отправляет уведомление.
+// @Tags         bookings
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      entity.CreateBookingRequest  true  "Данные бронирования"
+// @Success      201  {object}  entity.Booking           "Созданное бронирование"
+// @Failure      400  {object}  map[string]string        "Неверный формат / время в прошлом / слот занят"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /me/bookings [post]
 func (bc *BookingController) CreateBooking(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
@@ -49,6 +62,19 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 	c.JSON(http.StatusCreated, booking)
 }
 
+// CompleteBookingByID godoc
+// @Summary      Завершить бронирование
+// @Description  Помечает бронирование как завершённое. Доступно только staff.
+// @Tags         management
+// @Security     BearerAuth
+// @Param        id  path      int  true  "ID бронирования"
+// @Success      200  {object}  entity.Booking           "Обновлённое бронирование"
+// @Failure      400  {object}  map[string]string        "ID должен быть числом / бронирование ещё не завершено"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      404  {object}  map[string]string        "Бронирование не найдено"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /staffPanel/bookings/completeBooking/{id} [post]
 func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
@@ -79,6 +105,18 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 	c.JSON(http.StatusOK, booking)
 }
 
+// GetAllBookings godoc
+// @Summary      Получить все бронирования
+// @Description  Возвращает список всех бронирований в системе. Доступно только staff и admin.
+// @Tags         management
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   entity.Booking           "Список всех бронирований"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      403  {object}  map[string]string        "Доступ запрещён"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /staffPanel/bookings [get]
+// @Router       /adminPanel/bookings [get]
 func (bc *BookingController) GetAllBookings(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
@@ -95,6 +133,16 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 	c.JSON(http.StatusOK, bookings)
 }
 
+// GetMyBookings godoc
+// @Summary      Получить мои бронирования
+// @Description  Возвращает список всех бронирований текущего пользователя
+// @Tags         bookings
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   entity.Booking           "Список бронирований"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /me/bookings [get]
 func (bc *BookingController) GetMyBookings(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {
@@ -111,6 +159,18 @@ func (bc *BookingController) GetMyBookings(c *gin.Context) {
 	c.JSON(http.StatusOK, bookings)
 }
 
+// CancelMyBooking godoc
+// @Summary      Отменить бронирование
+// @Description  Отменяет бронирование, если оно ещё не началось
+// @Tags         bookings
+// @Security     BearerAuth
+// @Param        id  path      int  true  "ID бронирования"
+// @Success      204  {object}  nil                    "Бронирование отменено"
+// @Failure      400  {object}  map[string]string        "ID должен быть числом / бронирование уже активно"
+// @Failure      401  {object}  map[string]string        "Требуется авторизация"
+// @Failure      404  {object}  map[string]string        "Бронирование не найдено"
+// @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
+// @Router       /me/bookings/cancelBooking/{id} [post]
 func (bc *BookingController) CancelMyBooking(c *gin.Context) {
 	currentUser := auth.GetCurrentUser(c)
 	if currentUser == nil {

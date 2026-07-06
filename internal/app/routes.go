@@ -5,10 +5,27 @@ import (
 	"BookingGo/internal/controller"
 	"BookingGo/internal/ratelimit"
 
+	_ "BookingGo/docs"
+
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// SetupRoutes настраивает все маршруты API
+//
+// Структура API:
+//
+//	/api/auth/*              — публичные эндпоинты авторизации (тег: auth)
+//	/api/me/profile/*        — профиль пользователя (тег: profile)
+//	/api/me/otp/*            — двухфакторная аутентификация (тег: totp)
+//	/api/me/bookings/*       — бронирования пользователя (тег: bookings)
+//	/api/me/notifications/*  — уведомления пользователя (тег: notifications)
+//	/api/staffPanel/*        — панель персонала (тег: management)
+//	/api/adminPanel/*        — панель администратора (тег: management)
 func SetupRoutes(r *gin.Engine, deps *Dependencies) {
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	rlConfig := ratelimit.DefaultConfig()
 
 	r.Use(ratelimit.RateLimitMiddleware(deps.RateLimiter, rlConfig))
