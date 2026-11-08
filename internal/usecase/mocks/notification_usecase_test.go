@@ -2,7 +2,6 @@ package mocks
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -14,31 +13,31 @@ import (
 )
 
 var (
-	testNotifUserWithAll = &entity.User{
+	testNotifUserWithAll = &domain.User{
 		ID:    1,
 		Email: "user@example.com",
 		FIO:   "Иванов Иван Иванович",
 		Phone: "+79991234567",
 		Role:  enum.RoleClient,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: true,
 			IsPhoneSend: true,
 		},
 	}
 
-	testNotifUserWebOnly = &entity.User{
+	testNotifUserWebOnly = &domain.User{
 		ID:    2,
 		Email: "web@example.com",
 		FIO:   "Петров Петр Петрович",
 		Phone: "+79997654321",
 		Role:  enum.RoleClient,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: false,
 			IsPhoneSend: false,
 		},
 	}
 
-	testNotifBooking = &entity.Booking{
+	testNotifBooking = &domain.Booking{
 		ID:                 100,
 		UserID:             1,
 		SlotStart:          time.Now().Add(24 * time.Hour),
@@ -47,7 +46,7 @@ var (
 		ProblemDescription: "Engine not working",
 	}
 
-	testNotifNotification = &entity.Notification{
+	testNotifNotification = &domain.Notification{
 		ID:          1,
 		RecipientID: 1,
 		Title:       "Test title",
@@ -60,9 +59,9 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -74,7 +73,7 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 		Return(testNotifBooking, nil)
 
 	mockNotifRepo.EXPECT().
-		CreateNotif(gomock.Cond(func(n *entity.Notification) bool {
+		CreateNotif(gomock.Cond(func(n *domain.Notification) bool {
 			if n.RecipientID != testNotifUserWithAll.ID {
 				t.Errorf("Expected RecipientID %d, got %d", testNotifUserWithAll.ID, n.RecipientID)
 			}
@@ -97,7 +96,7 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
-	params := entity.NotificationParams{
+	params := domain.NotificationParams{
 		BookingID: testNotifBooking.ID,
 		IP:        "127.0.0.1",
 	}
@@ -113,9 +112,9 @@ func TestNotificationUseCase_CreateNotification_WebOnly(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -132,7 +131,7 @@ func TestNotificationUseCase_CreateNotification_WebOnly(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
-	params := entity.NotificationParams{}
+	params := domain.NotificationParams{}
 
 	err := useCase.CreateNotification(testNotifUserWebOnly.ID, enum.AuthType, params)
 
@@ -145,9 +144,9 @@ func TestNotificationUseCase_CreateNotification_WithoutBooking(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -168,7 +167,7 @@ func TestNotificationUseCase_CreateNotification_WithoutBooking(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
-	params := entity.NotificationParams{
+	params := domain.NotificationParams{
 		BookingID: 0,
 	}
 
@@ -183,9 +182,9 @@ func TestNotificationUseCase_CreateNotification_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -194,7 +193,7 @@ func TestNotificationUseCase_CreateNotification_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
-	params := entity.NotificationParams{}
+	params := domain.NotificationParams{}
 
 	err := useCase.CreateNotification(999, enum.AuthType, params)
 
@@ -207,17 +206,17 @@ func TestNotificationUseCase_GetMyNotifications_CacheHit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 
 	mockCache.EXPECT().
 		Get(context.Background(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, key string, dest any) error {
-			if notifsPtr, ok := dest.(*[]entity.Notification); ok {
+			if notifsPtr, ok := dest.(*[]domain.Notification); ok {
 				*notifsPtr = expectedNotifs
 			}
 			return nil
@@ -243,12 +242,12 @@ func TestNotificationUseCase_GetMyNotifications_CacheMiss(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 
 	mockCache.EXPECT().
 		Get(context.Background(), gomock.Any(), gomock.Any()).
@@ -278,12 +277,12 @@ func TestNotificationUseCase_GetMyNotifications_CacheSetError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 
 	mockCache.EXPECT().
 		Get(context.Background(), gomock.Any(), gomock.Any()).
@@ -295,7 +294,7 @@ func TestNotificationUseCase_GetMyNotifications_CacheSetError(t *testing.T) {
 
 	mockCache.EXPECT().
 		Set(context.Background(), gomock.Any(), gomock.Any(), 60*time.Second).
-		Return(errors.New("cache error"))
+		Return(errors.New("redis error"))
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
@@ -313,12 +312,12 @@ func TestNotificationUseCase_UpdateNotificationSettings_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	newSettings := &entity.NotificationSettings{
+	newSettings := &domain.NotificationSettings{
 		IsEmailSend: false,
 		IsPhoneSend: true,
 	}
@@ -344,9 +343,9 @@ func TestNotificationUseCase_UpdateNotificationSettings_DBError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	dbError := errors.New("database error")
@@ -357,7 +356,7 @@ func TestNotificationUseCase_UpdateNotificationSettings_DBError(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(mockNotifRepo, mockBookingRepo, mockUserRepo, mockCache)
 
-	err := useCase.UpdateNotificationSettings(testNotifUserWithAll.ID, &entity.NotificationSettings{})
+	err := useCase.UpdateNotificationSettings(testNotifUserWithAll.ID, &domain.NotificationSettings{})
 
 	if !errors.Is(err, dbError) {
 		t.Errorf("Expected database error, got: %v", err)
@@ -368,9 +367,9 @@ func TestNotificationUseCase_MarkAllAsRead_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockNotifRepo.EXPECT().
@@ -394,9 +393,9 @@ func TestNotificationUseCase_MarkAllAsRead_DBError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockNotifRepo := NewMockNotificationRepository(ctrl)
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockNotifRepo := NewMockNotificationPostgres(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	dbError := errors.New("database error")

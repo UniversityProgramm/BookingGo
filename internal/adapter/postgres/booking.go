@@ -1,0 +1,88 @@
+package postgres
+
+import (
+	"BookingGo/internal/domain"
+	"BookingGo/internal/enum"
+	"context"
+	"errors"
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type BookingPostgres struct {
+	db *gorm.DB
+}
+
+func NewBookingPostgres(DB *gorm.DB) *BookingPostgres {
+	return &BookingPostgres{db: DB}
+}
+
+func (r *BookingPostgres) Create(ctx context.Context, booking *domain.Booking) error {
+	return r.db.WithContext(ctx).Create(booking).Error
+}
+
+func (r *BookingPostgres) IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&domain.Booking{}).
+		Where("slot_start < ? AND ? < slot_end", end, start).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count == 0, nil
+}
+
+func (r *BookingPostgres) GetAll() ([]domain.Booking, error) {
+	var bookings []domain.Booking
+	result := r.db.Find(&bookings)
+	return bookings, result.Error
+}
+
+func (r *BookingPostgres) GetAllBookingsByUserID(id int) ([]domain.Booking, error) {
+	var bookings []domain.Booking
+	err := r.db.Where("user_id = ?", id).Order("slot_start ASC").Find(&bookings).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return bookings, nil
+}
+
+func (r *BookingPostgres) GetBookingByID(id int) (*domain.Booking, error) {
+	var booking domain.Booking
+	err := r.db.First(&booking, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrBookingNotFound
+		}
+		return nil, err
+	}
+
+	return &booking, nil
+}
+
+func (r *BookingPostgres) SetBookingComplete(bookingID int) (*domain.Booking, error) {
+	result := r.db.Model(&domain.Booking{}).Where("id = ?", bookingID).Update("status", enum.StatusCompleted)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrBookingNotFound
+	}
+
+	return r.GetBookingByID(bookingID)
+}
+
+func (r *BookingPostgres) SetBookingCancel(bookingID, userID int) (*domain.Booking, error) {
+	result := r.db.Model(&domain.Booking{}).Where("id = ? AND user_id = ?", bookingID, userID).Update("status", enum.StatusCancelled)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, domain.ErrBookingNotFound
+	}
+
+	return r.GetBookingByID(bookingID)
+}

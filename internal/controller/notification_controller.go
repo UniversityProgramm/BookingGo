@@ -3,7 +3,6 @@ package controller
 import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -25,7 +24,7 @@ func NewNotificationController(notificationUseCase *usecase.NotificationUseCase)
 // @Tags         notifications
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {array}   entity.Notification      "Список уведомлений"
+// @Success      200  {array}   domain.Notification      "Список уведомлений"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
 // @Router       /me/notifications [get]
@@ -70,7 +69,7 @@ func (nc *NotificationController) GetMyNotifications(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.NotificationSettings  true  "Настройки уведомлений"
+// @Param        request  body      domain.NotificationSettings  true  "Настройки уведомлений"
 // @Success      200  {object}  map[string]interface{}  "Настройки обновлены"
 // @Failure      400  {object}  map[string]string       "Неверный формат"
 // @Failure      401  {object}  map[string]string       "Требуется авторизация"
@@ -84,7 +83,7 @@ func (nc *NotificationController) UpdateNotificationSettings(c *gin.Context) {
 		return
 	}
 
-	var settingsReq entity.NotificationSettings
+	var settingsReq domain.NotificationSettings
 	if err := c.ShouldBind(&settingsReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return

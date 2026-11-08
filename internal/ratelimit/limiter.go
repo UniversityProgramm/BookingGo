@@ -1,7 +1,7 @@
 package ratelimit
 
 import (
-	"BookingGo/internal/cache"
+	"BookingGo/internal/adapter/redis"
 	"BookingGo/pkg/logger"
 	"context"
 	"time"
@@ -20,7 +20,7 @@ type Limiter interface {
 }
 
 // Создаёт rate limiter, используя существующий Cache
-func Init(cacheService cache.Cache) Limiter {
+func Init(cacheService redis.Cache) Limiter {
 	limiter, err := NewRedisLimiter(cacheService)
 	if err != nil {
 		logger.Log.Warn("[RateLimit] Failed to create Redis limiter, using noop",
@@ -29,6 +29,6 @@ func Init(cacheService cache.Cache) Limiter {
 		return NewNoopLimiter()
 	}
 
-	logger.Log.Info("[RateLimit] Redis rate limiter initialized (shared cache)")
+	logger.Log.Info("[RateLimit] Redis rate limiter initialized (shared redis)")
 	return limiter
 }

@@ -10,39 +10,39 @@
 package mocks
 
 import (
-	entity "BookingGo/internal/entity"
+	domain "BookingGo/internal/domain"
 	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockUserRepository is a mock of UserRepository interface.
-type MockUserRepository struct {
+// MockUserPostgres is a mock of UserPostgres interface.
+type MockUserPostgres struct {
 	ctrl     *gomock.Controller
-	recorder *MockUserRepositoryMockRecorder
+	recorder *MockUserPostgresMockRecorder
 	isgomock struct{}
 }
 
-// MockUserRepositoryMockRecorder is the mock recorder for MockUserRepository.
-type MockUserRepositoryMockRecorder struct {
-	mock *MockUserRepository
+// MockUserPostgresMockRecorder is the mock recorder for MockUserPostgres.
+type MockUserPostgresMockRecorder struct {
+	mock *MockUserPostgres
 }
 
-// NewMockUserRepository creates a new mock instance.
-func NewMockUserRepository(ctrl *gomock.Controller) *MockUserRepository {
-	mock := &MockUserRepository{ctrl: ctrl}
-	mock.recorder = &MockUserRepositoryMockRecorder{mock}
+// NewMockUserPostgres creates a new mock instance.
+func NewMockUserPostgres(ctrl *gomock.Controller) *MockUserPostgres {
+	mock := &MockUserPostgres{ctrl: ctrl}
+	mock.recorder = &MockUserPostgresMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
+func (m *MockUserPostgres) EXPECT() *MockUserPostgresMockRecorder {
 	return m.recorder
 }
 
 // Create mocks base method.
-func (m *MockUserRepository) Create(user *entity.User) error {
+func (m *MockUserPostgres) Create(user *domain.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", user)
 	ret0, _ := ret[0].(error)
@@ -50,13 +50,13 @@ func (m *MockUserRepository) Create(user *entity.User) error {
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockUserRepositoryMockRecorder) Create(user any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) Create(user any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserRepository)(nil).Create), user)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserPostgres)(nil).Create), user)
 }
 
 // Delete mocks base method.
-func (m *MockUserRepository) Delete(id int) error {
+func (m *MockUserPostgres) Delete(id int) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", id)
 	ret0, _ := ret[0].(error)
@@ -64,13 +64,13 @@ func (m *MockUserRepository) Delete(id int) error {
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockUserRepositoryMockRecorder) Delete(id any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) Delete(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockUserRepository)(nil).Delete), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockUserPostgres)(nil).Delete), id)
 }
 
 // EmailExists mocks base method.
-func (m *MockUserRepository) EmailExists(email string) (bool, error) {
+func (m *MockUserPostgres) EmailExists(email string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EmailExists", email)
 	ret0, _ := ret[0].(bool)
@@ -79,97 +79,97 @@ func (m *MockUserRepository) EmailExists(email string) (bool, error) {
 }
 
 // EmailExists indicates an expected call of EmailExists.
-func (mr *MockUserRepositoryMockRecorder) EmailExists(email any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) EmailExists(email any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EmailExists", reflect.TypeOf((*MockUserRepository)(nil).EmailExists), email)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EmailExists", reflect.TypeOf((*MockUserPostgres)(nil).EmailExists), email)
 }
 
 // GetAll mocks base method.
-func (m *MockUserRepository) GetAll() ([]entity.User, error) {
+func (m *MockUserPostgres) GetAll() ([]domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll")
-	ret0, _ := ret[0].([]entity.User)
+	ret0, _ := ret[0].([]domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAll indicates an expected call of GetAll.
-func (mr *MockUserRepositoryMockRecorder) GetAll() *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) GetAll() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockUserRepository)(nil).GetAll))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockUserPostgres)(nil).GetAll))
 }
 
 // GetByEmail mocks base method.
-func (m *MockUserRepository) GetByEmail(email string) (*entity.User, error) {
+func (m *MockUserPostgres) GetByEmail(email string) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByEmail", email)
-	ret0, _ := ret[0].(*entity.User)
+	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByEmail indicates an expected call of GetByEmail.
-func (mr *MockUserRepositoryMockRecorder) GetByEmail(email any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) GetByEmail(email any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmail", reflect.TypeOf((*MockUserRepository)(nil).GetByEmail), email)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmail", reflect.TypeOf((*MockUserPostgres)(nil).GetByEmail), email)
 }
 
 // GetByEmailContext mocks base method.
-func (m *MockUserRepository) GetByEmailContext(ctx context.Context, email string) (*entity.User, error) {
+func (m *MockUserPostgres) GetByEmailContext(ctx context.Context, email string) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByEmailContext", ctx, email)
-	ret0, _ := ret[0].(*entity.User)
+	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByEmailContext indicates an expected call of GetByEmailContext.
-func (mr *MockUserRepositoryMockRecorder) GetByEmailContext(ctx, email any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) GetByEmailContext(ctx, email any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmailContext", reflect.TypeOf((*MockUserRepository)(nil).GetByEmailContext), ctx, email)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmailContext", reflect.TypeOf((*MockUserPostgres)(nil).GetByEmailContext), ctx, email)
 }
 
 // GetByID mocks base method.
-func (m *MockUserRepository) GetByID(id int) (*entity.User, error) {
+func (m *MockUserPostgres) GetByID(id int) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByID", id)
-	ret0, _ := ret[0].(*entity.User)
+	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByID indicates an expected call of GetByID.
-func (mr *MockUserRepositoryMockRecorder) GetByID(id any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) GetByID(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserRepository)(nil).GetByID), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserPostgres)(nil).GetByID), id)
 }
 
 // GetByIDContext mocks base method.
-func (m *MockUserRepository) GetByIDContext(ctx context.Context, id int) (*entity.User, error) {
+func (m *MockUserPostgres) GetByIDContext(ctx context.Context, id int) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByIDContext", ctx, id)
-	ret0, _ := ret[0].(*entity.User)
+	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByIDContext indicates an expected call of GetByIDContext.
-func (mr *MockUserRepositoryMockRecorder) GetByIDContext(ctx, id any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) GetByIDContext(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDContext", reflect.TypeOf((*MockUserRepository)(nil).GetByIDContext), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDContext", reflect.TypeOf((*MockUserPostgres)(nil).GetByIDContext), ctx, id)
 }
 
 // Update mocks base method.
-func (m *MockUserRepository) Update(id int, requestUser map[string]any) (*entity.User, error) {
+func (m *MockUserPostgres) Update(id int, requestUser map[string]any) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", id, requestUser)
-	ret0, _ := ret[0].(*entity.User)
+	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockUserRepositoryMockRecorder) Update(id, requestUser any) *gomock.Call {
+func (mr *MockUserPostgresMockRecorder) Update(id, requestUser any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserRepository)(nil).Update), id, requestUser)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserPostgres)(nil).Update), id, requestUser)
 }

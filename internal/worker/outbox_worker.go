@@ -1,9 +1,9 @@
 package worker
 
 import (
-	"BookingGo/internal/entity"
+	"BookingGo/internal/adapter/postgres"
+	"BookingGo/internal/domain"
 	"BookingGo/internal/enum"
-	"BookingGo/internal/repository"
 	"BookingGo/internal/usecase"
 	"BookingGo/pkg/logger"
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 type OutboxWorker struct {
-	outboxRepo   *repository.OutboxRepository
+	outboxRepo   *postgres.OutboxPostgres
 	notifUseCase *usecase.NotificationUseCase
 	interval     time.Duration
 
@@ -25,7 +25,7 @@ type OutboxWorker struct {
 	running atomic.Bool
 }
 
-func NewOutboxWorker(outboxRepo *repository.OutboxRepository, notifUseCase *usecase.NotificationUseCase) *OutboxWorker {
+func NewOutboxWorker(outboxRepo *postgres.OutboxPostgres, notifUseCase *usecase.NotificationUseCase) *OutboxWorker {
 	return &OutboxWorker{
 		outboxRepo:   outboxRepo,
 		notifUseCase: notifUseCase,
@@ -92,13 +92,13 @@ func (w *OutboxWorker) processBatch() {
 	}
 }
 
-func (w *OutboxWorker) processEvent(event entity.OutboxEvent) error {
+func (w *OutboxWorker) processEvent(event domain.OutboxEvent) error {
 	var payload map[string]any
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
 		return err
 	}
 
-	params := entity.NotificationParams{}
+	params := domain.NotificationParams{}
 	userID := int(payload["user_id"].(float64))
 	eventType := enum.TypeOfNotification(event.EventType)
 

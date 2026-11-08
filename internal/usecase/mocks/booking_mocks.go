@@ -10,7 +10,7 @@
 package mocks
 
 import (
-	entity "BookingGo/internal/entity"
+	domain "BookingGo/internal/domain"
 	context "context"
 	reflect "reflect"
 	time "time"
@@ -18,32 +18,32 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockBookingRepository is a mock of BookingRepository interface.
-type MockBookingRepository struct {
+// MockBookingPostgres is a mock of BookingPostgres interface.
+type MockBookingPostgres struct {
 	ctrl     *gomock.Controller
-	recorder *MockBookingRepositoryMockRecorder
+	recorder *MockBookingPostgresMockRecorder
 	isgomock struct{}
 }
 
-// MockBookingRepositoryMockRecorder is the mock recorder for MockBookingRepository.
-type MockBookingRepositoryMockRecorder struct {
-	mock *MockBookingRepository
+// MockBookingPostgresMockRecorder is the mock recorder for MockBookingPostgres.
+type MockBookingPostgresMockRecorder struct {
+	mock *MockBookingPostgres
 }
 
-// NewMockBookingRepository creates a new mock instance.
-func NewMockBookingRepository(ctrl *gomock.Controller) *MockBookingRepository {
-	mock := &MockBookingRepository{ctrl: ctrl}
-	mock.recorder = &MockBookingRepositoryMockRecorder{mock}
+// NewMockBookingPostgres creates a new mock instance.
+func NewMockBookingPostgres(ctrl *gomock.Controller) *MockBookingPostgres {
+	mock := &MockBookingPostgres{ctrl: ctrl}
+	mock.recorder = &MockBookingPostgresMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockBookingRepository) EXPECT() *MockBookingRepositoryMockRecorder {
+func (m *MockBookingPostgres) EXPECT() *MockBookingPostgresMockRecorder {
 	return m.recorder
 }
 
 // Create mocks base method.
-func (m *MockBookingRepository) Create(ctx context.Context, booking *entity.Booking) error {
+func (m *MockBookingPostgres) Create(ctx context.Context, booking *domain.Booking) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, booking)
 	ret0, _ := ret[0].(error)
@@ -51,58 +51,58 @@ func (m *MockBookingRepository) Create(ctx context.Context, booking *entity.Book
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockBookingRepositoryMockRecorder) Create(ctx, booking any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) Create(ctx, booking any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockBookingRepository)(nil).Create), ctx, booking)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockBookingPostgres)(nil).Create), ctx, booking)
 }
 
 // GetAll mocks base method.
-func (m *MockBookingRepository) GetAll() ([]entity.Booking, error) {
+func (m *MockBookingPostgres) GetAll() ([]domain.Booking, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll")
-	ret0, _ := ret[0].([]entity.Booking)
+	ret0, _ := ret[0].([]domain.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAll indicates an expected call of GetAll.
-func (mr *MockBookingRepositoryMockRecorder) GetAll() *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) GetAll() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockBookingRepository)(nil).GetAll))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockBookingPostgres)(nil).GetAll))
 }
 
 // GetAllBookingsByUserID mocks base method.
-func (m *MockBookingRepository) GetAllBookingsByUserID(id int) ([]entity.Booking, error) {
+func (m *MockBookingPostgres) GetAllBookingsByUserID(id int) ([]domain.Booking, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllBookingsByUserID", id)
-	ret0, _ := ret[0].([]entity.Booking)
+	ret0, _ := ret[0].([]domain.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAllBookingsByUserID indicates an expected call of GetAllBookingsByUserID.
-func (mr *MockBookingRepositoryMockRecorder) GetAllBookingsByUserID(id any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) GetAllBookingsByUserID(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllBookingsByUserID", reflect.TypeOf((*MockBookingRepository)(nil).GetAllBookingsByUserID), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllBookingsByUserID", reflect.TypeOf((*MockBookingPostgres)(nil).GetAllBookingsByUserID), id)
 }
 
 // GetBookingByID mocks base method.
-func (m *MockBookingRepository) GetBookingByID(id int) (*entity.Booking, error) {
+func (m *MockBookingPostgres) GetBookingByID(id int) (*domain.Booking, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBookingByID", id)
-	ret0, _ := ret[0].(*entity.Booking)
+	ret0, _ := ret[0].(*domain.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBookingByID indicates an expected call of GetBookingByID.
-func (mr *MockBookingRepositoryMockRecorder) GetBookingByID(id any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) GetBookingByID(id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookingByID", reflect.TypeOf((*MockBookingRepository)(nil).GetBookingByID), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookingByID", reflect.TypeOf((*MockBookingPostgres)(nil).GetBookingByID), id)
 }
 
 // IsSlotAvailable mocks base method.
-func (m *MockBookingRepository) IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error) {
+func (m *MockBookingPostgres) IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsSlotAvailable", ctx, start, end)
 	ret0, _ := ret[0].(bool)
@@ -111,67 +111,67 @@ func (m *MockBookingRepository) IsSlotAvailable(ctx context.Context, start, end 
 }
 
 // IsSlotAvailable indicates an expected call of IsSlotAvailable.
-func (mr *MockBookingRepositoryMockRecorder) IsSlotAvailable(ctx, start, end any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) IsSlotAvailable(ctx, start, end any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSlotAvailable", reflect.TypeOf((*MockBookingRepository)(nil).IsSlotAvailable), ctx, start, end)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSlotAvailable", reflect.TypeOf((*MockBookingPostgres)(nil).IsSlotAvailable), ctx, start, end)
 }
 
 // SetBookingCancel mocks base method.
-func (m *MockBookingRepository) SetBookingCancel(bookingID, userID int) (*entity.Booking, error) {
+func (m *MockBookingPostgres) SetBookingCancel(bookingID, userID int) (*domain.Booking, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetBookingCancel", bookingID, userID)
-	ret0, _ := ret[0].(*entity.Booking)
+	ret0, _ := ret[0].(*domain.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SetBookingCancel indicates an expected call of SetBookingCancel.
-func (mr *MockBookingRepositoryMockRecorder) SetBookingCancel(bookingID, userID any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) SetBookingCancel(bookingID, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBookingCancel", reflect.TypeOf((*MockBookingRepository)(nil).SetBookingCancel), bookingID, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBookingCancel", reflect.TypeOf((*MockBookingPostgres)(nil).SetBookingCancel), bookingID, userID)
 }
 
 // SetBookingComplete mocks base method.
-func (m *MockBookingRepository) SetBookingComplete(bookingID int) (*entity.Booking, error) {
+func (m *MockBookingPostgres) SetBookingComplete(bookingID int) (*domain.Booking, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetBookingComplete", bookingID)
-	ret0, _ := ret[0].(*entity.Booking)
+	ret0, _ := ret[0].(*domain.Booking)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SetBookingComplete indicates an expected call of SetBookingComplete.
-func (mr *MockBookingRepositoryMockRecorder) SetBookingComplete(bookingID any) *gomock.Call {
+func (mr *MockBookingPostgresMockRecorder) SetBookingComplete(bookingID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBookingComplete", reflect.TypeOf((*MockBookingRepository)(nil).SetBookingComplete), bookingID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBookingComplete", reflect.TypeOf((*MockBookingPostgres)(nil).SetBookingComplete), bookingID)
 }
 
-// MockOutboxRepository is a mock of OutboxRepository interface.
-type MockOutboxRepository struct {
+// MockOutboxPostgres is a mock of OutboxPostgres interface.
+type MockOutboxPostgres struct {
 	ctrl     *gomock.Controller
-	recorder *MockOutboxRepositoryMockRecorder
+	recorder *MockOutboxPostgresMockRecorder
 	isgomock struct{}
 }
 
-// MockOutboxRepositoryMockRecorder is the mock recorder for MockOutboxRepository.
-type MockOutboxRepositoryMockRecorder struct {
-	mock *MockOutboxRepository
+// MockOutboxPostgresMockRecorder is the mock recorder for MockOutboxPostgres.
+type MockOutboxPostgresMockRecorder struct {
+	mock *MockOutboxPostgres
 }
 
-// NewMockOutboxRepository creates a new mock instance.
-func NewMockOutboxRepository(ctrl *gomock.Controller) *MockOutboxRepository {
-	mock := &MockOutboxRepository{ctrl: ctrl}
-	mock.recorder = &MockOutboxRepositoryMockRecorder{mock}
+// NewMockOutboxPostgres creates a new mock instance.
+func NewMockOutboxPostgres(ctrl *gomock.Controller) *MockOutboxPostgres {
+	mock := &MockOutboxPostgres{ctrl: ctrl}
+	mock.recorder = &MockOutboxPostgresMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockOutboxRepository) EXPECT() *MockOutboxRepositoryMockRecorder {
+func (m *MockOutboxPostgres) EXPECT() *MockOutboxPostgresMockRecorder {
 	return m.recorder
 }
 
 // CreateEvent mocks base method.
-func (m *MockOutboxRepository) CreateEvent(event *entity.OutboxEvent) error {
+func (m *MockOutboxPostgres) CreateEvent(event *domain.OutboxEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEvent", event)
 	ret0, _ := ret[0].(error)
@@ -179,13 +179,13 @@ func (m *MockOutboxRepository) CreateEvent(event *entity.OutboxEvent) error {
 }
 
 // CreateEvent indicates an expected call of CreateEvent.
-func (mr *MockOutboxRepositoryMockRecorder) CreateEvent(event any) *gomock.Call {
+func (mr *MockOutboxPostgresMockRecorder) CreateEvent(event any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockOutboxRepository)(nil).CreateEvent), event)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockOutboxPostgres)(nil).CreateEvent), event)
 }
 
 // CreateEventContext mocks base method.
-func (m *MockOutboxRepository) CreateEventContext(ctx context.Context, event *entity.OutboxEvent) error {
+func (m *MockOutboxPostgres) CreateEventContext(ctx context.Context, event *domain.OutboxEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEventContext", ctx, event)
 	ret0, _ := ret[0].(error)
@@ -193,7 +193,7 @@ func (m *MockOutboxRepository) CreateEventContext(ctx context.Context, event *en
 }
 
 // CreateEventContext indicates an expected call of CreateEventContext.
-func (mr *MockOutboxRepositoryMockRecorder) CreateEventContext(ctx, event any) *gomock.Call {
+func (mr *MockOutboxPostgresMockRecorder) CreateEventContext(ctx, event any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEventContext", reflect.TypeOf((*MockOutboxRepository)(nil).CreateEventContext), ctx, event)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEventContext", reflect.TypeOf((*MockOutboxPostgres)(nil).CreateEventContext), ctx, event)
 }

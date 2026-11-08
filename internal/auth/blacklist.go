@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"BookingGo/internal/cache"
+	"BookingGo/internal/adapter/redis"
 	"context"
 	"strconv"
 	"time"
@@ -20,10 +20,10 @@ type Blacklist interface {
 }
 
 type BlacklistService struct {
-	cache cache.Cache
+	cache redis.Cache
 }
 
-func NewBlacklistService(cache cache.Cache) Blacklist {
+func NewBlacklistService(cache redis.Cache) Blacklist {
 	return &BlacklistService{cache: cache}
 }
 

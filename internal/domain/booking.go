@@ -1,4 +1,4 @@
-package entity
+package domain
 
 import (
 	"BookingGo/internal/enum"
@@ -14,9 +14,4 @@ type Booking struct {
 	ProblemDescription string             `json:"problem_description" gorm:"not null"`
 	CreatedAt          time.Time          `json:"created_at" gorm:"not null;autoCreateTime"`
 	UpdatedAt          time.Time          `json:"updated_at" gorm:"not null;autoUpdateTime"`
-}
-
-type CreateBookingRequest struct {
-	SlotStart          time.Time `json:"slot_start" binding:"required"`
-	ProblemDescription string    `json:"problem_description"`
 }

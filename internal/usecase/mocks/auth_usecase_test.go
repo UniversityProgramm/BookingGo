@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -13,7 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-var testAuthUser = &entity.User{
+var testAuthUser = &domain.User{
 	ID:           1,
 	Email:        "test@example.com",
 	PasswordHash: "$2a$10$C1AtwB2zZtvq5llPqyEkY.YIDB28fNHrVUrcBN1F6CgEDb.YdU0qa", //password123
@@ -23,20 +23,20 @@ var testAuthUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
-	UserNotificationSettings: entity.NotificationSettings{
+	UserNotificationSettings: domain.NotificationSettings{
 		IsEmailSend: true,
 		IsPhoneSend: false,
 	},
 }
 
-var userWithTotp = &entity.User{
+var userWithTotp = &domain.User{
 	ID:            1,
 	IsTotpEnabled: true,
 	TotpSecret:    "SECRET123",
 	PasswordHash:  testAuthUser.PasswordHash,
 }
 
-var userWithSecret = &entity.User{
+var userWithSecret = &domain.User{
 	ID:            3,
 	Email:         "user@example.com",
 	PasswordHash:  testAuthUser.PasswordHash,
@@ -48,14 +48,14 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
-		GetUserByEmail(testAuthUser.Email).
+		GetByEmail(testAuthUser.Email).
 		Return(testAuthUser, nil)
 
 	mockOutboxRepo.EXPECT().
@@ -64,7 +64,7 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.LoginUserRequest{
+	req := &dto.LoginUserRequest{
 		Email:    testAuthUser.Email,
 		Password: "password123",
 	}
@@ -82,19 +82,19 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
-		GetUserByEmail("not_exist@example.com").
+		GetByEmail("not_exist@example.com").
 		Return(nil, domain.ErrUserNotFound)
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.LoginUserRequest{
+	req := &dto.LoginUserRequest{
 		Email:    "not_exist@example.com",
 		Password: "password123",
 	}
@@ -110,19 +110,19 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
-		GetUserByEmail(testAuthUser.Email).
+		GetByEmail(testAuthUser.Email).
 		Return(testAuthUser, nil)
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.LoginUserRequest{
+	req := &dto.LoginUserRequest{
 		Email:    testAuthUser.Email,
 		Password: "password1234",
 	}
@@ -138,27 +138,27 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
-	newUser := &entity.User{
+	newUser := &domain.User{
 		ID:    10,
 		Email: "new@example.com",
 		Role:  enum.RoleClient,
 	}
 
 	mockUserUseCase.EXPECT().
-		CreateUser(gomock.Cond(func(req *entity.CreateUserRequest) bool {
+		CreateUser(gomock.Cond(func(req *dto.CreateUserRequest) bool {
 			return req.Email == "new@example.com"
 		})).
 		Return(newUser, nil)
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.CreateUserRequest{
+	req := &dto.CreateUserRequest{
 		Email:    "new@example.com",
 		Password: "password123",
 		FIO:      "New User",
@@ -178,21 +178,21 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	mockUserUseCase.EXPECT().
-		CreateUser(gomock.Cond(func(req *entity.CreateUserRequest) bool {
+		CreateUser(gomock.Cond(func(req *dto.CreateUserRequest) bool {
 			return req.Email == "taken@example.com"
 		})).
 		Return(nil, domain.ErrEmailTaken)
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.CreateUserRequest{
+	req := &dto.CreateUserRequest{
 		Email:    "taken@example.com",
 		Password: "password123",
 		FIO:      "New User",
@@ -209,8 +209,8 @@ func TestAuthUseCase_GetMe_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -243,8 +243,8 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -254,7 +254,7 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, key string, dest any) error {
-			if userPtr, ok := dest.(*entity.User); ok {
+			if userPtr, ok := dest.(*domain.User); ok {
 				*userPtr = *testAuthUser
 			}
 			return nil
@@ -262,7 +262,7 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 
 	mockUserUseCase.EXPECT().
 		GetUserByID(gomock.Any()).
-		DoAndReturn(func(id int) (*entity.User, error) {
+		DoAndReturn(func(id int) (*domain.User, error) {
 			dbCalled = true
 			return testAuthUser, nil
 		}).
@@ -279,7 +279,7 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 		t.Errorf("Expected email %s, got %s", testAuthUser.Email, user.Email)
 	}
 	if dbCalled {
-		t.Error("GetUserByID should not be called on cache hit")
+		t.Error("GetUserByID should not be called on redis hit")
 	}
 }
 
@@ -287,8 +287,8 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -321,7 +321,7 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 		t.Errorf("Expected email %s, got %s", testAuthUser.Email, user.Email)
 	}
 	if !cacheSetCalled {
-		t.Error("Cache Set should be called on cache miss")
+		t.Error("Cache Set should be called on redis miss")
 	}
 }
 
@@ -329,8 +329,8 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -345,7 +345,7 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 
 	mockCache.EXPECT().
 		Set(gomock.Any(), gomock.Any(), gomock.Any(), 300*time.Second).
-		Return(errors.New("cache error"))
+		Return(errors.New("redis error"))
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
@@ -363,8 +363,8 @@ func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -390,14 +390,14 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
-	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
+	req := &dto.UpdateUserProfileRequest{FIO: &newFIO}
 
 	updatedUser := *testAuthUser
 	updatedUser.FIO = newFIO
@@ -426,14 +426,14 @@ func TestAuthUseCase_UpdateMe_CacheInvalidation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
-	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
+	req := &dto.UpdateUserProfileRequest{FIO: &newFIO}
 
 	updatedUser := *testAuthUser
 	updatedUser.FIO = newFIO
@@ -459,14 +459,14 @@ func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
 
 	newFIO := "Updated Name"
-	req := &entity.UpdateUserProfileRequest{FIO: &newFIO}
+	req := &dto.UpdateUserProfileRequest{FIO: &newFIO}
 
 	updatedUser := *testAuthUser
 	updatedUser.FIO = newFIO
@@ -488,8 +488,8 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -518,7 +518,7 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newPassword456",
 	}
@@ -534,8 +534,8 @@ func TestAuthUseCase_ChangePassword_WrongCurrentPassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -546,7 +546,7 @@ func TestAuthUseCase_ChangePassword_WrongCurrentPassword(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "wong_pass",
 		NewPassword:     "newPassword456",
 	}
@@ -562,8 +562,8 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -574,7 +574,7 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
 	}
@@ -590,8 +590,8 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -602,7 +602,7 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
 	}
@@ -618,8 +618,8 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -646,7 +646,7 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newPassword456",
 		OtpCode:         "123456",
@@ -663,8 +663,8 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -675,7 +675,7 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newPassword456",
 		OtpCode:         "",
@@ -692,8 +692,8 @@ func TestAuthUseCase_ChangePassword_InvalidCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -708,7 +708,7 @@ func TestAuthUseCase_ChangePassword_InvalidCode(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangePasswordRequest{
+	req := &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newPassword456",
 		OtpCode:         "000000",
@@ -725,8 +725,8 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -741,7 +741,7 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 
 	mockUserUseCase.EXPECT().
 		UpdateUserData(testAuthUser.ID, gomock.Any()).
-		Return(&entity.User{ID: testAuthUser.ID, Email: "newemail@example.com"}, nil)
+		Return(&domain.User{ID: testAuthUser.ID, Email: "newemail@example.com"}, nil)
 
 	mockCache.EXPECT().
 		Delete(gomock.Any(), gomock.Any()).
@@ -757,7 +757,7 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
 		ConfirmPassword: "password123",
 	}
@@ -776,8 +776,8 @@ func TestAuthUseCase_ChangeEmail_CacheInvalidation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -792,7 +792,7 @@ func TestAuthUseCase_ChangeEmail_CacheInvalidation(t *testing.T) {
 
 	mockUserUseCase.EXPECT().
 		UpdateUserData(testAuthUser.ID, gomock.Any()).
-		Return(&entity.User{ID: testAuthUser.ID, Email: "new@example.com"}, nil)
+		Return(&domain.User{ID: testAuthUser.ID, Email: "new@example.com"}, nil)
 
 	mockCache.EXPECT().
 		Delete(gomock.Any(), gomock.Any()).
@@ -808,7 +808,7 @@ func TestAuthUseCase_ChangeEmail_CacheInvalidation(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
 	}
@@ -824,8 +824,8 @@ func TestAuthUseCase_ChangeEmail_EmailTaken(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -840,7 +840,7 @@ func TestAuthUseCase_ChangeEmail_EmailTaken(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "taken@example.com",
 		ConfirmPassword: "password123",
 	}
@@ -856,8 +856,8 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -872,7 +872,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "wrong_password",
 	}
@@ -888,8 +888,8 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -900,7 +900,7 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "taken@example.com",
 		ConfirmPassword: "password123",
 	}
@@ -916,8 +916,8 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -932,7 +932,7 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 
 	mockUserUseCase.EXPECT().
 		UpdateUserData(userWithTotp.ID, gomock.Any()).
-		Return(&entity.User{Email: "newemail@example.com"}, nil)
+		Return(&domain.User{Email: "newemail@example.com"}, nil)
 
 	mockTotpService.EXPECT().
 		ValidateCode(userWithTotp.TotpSecret, "123456").
@@ -952,7 +952,7 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "123456",
@@ -972,8 +972,8 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -988,7 +988,7 @@ func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "",
@@ -1005,8 +1005,8 @@ func TestAuthUseCase_ChangeEmail_InvalidCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1025,7 +1025,7 @@ func TestAuthUseCase_ChangeEmail_InvalidCode(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.ChangeEmailRequest{
+	req := &dto.ChangeEmailRequest{
 		NewEmail:        "newemail@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "000000",
@@ -1042,8 +1042,8 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1078,8 +1078,8 @@ func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1101,8 +1101,8 @@ func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1124,8 +1124,8 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1149,7 +1149,7 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{
+	req := &dto.VerifyTotpRequest{
 		OtpCode: "123456",
 	}
 
@@ -1164,8 +1164,8 @@ func TestAuthUseCase_VerifyTotp_CacheInvalidation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1188,7 +1188,7 @@ func TestAuthUseCase_VerifyTotp_CacheInvalidation(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{OtpCode: "123456"}
+	req := &dto.VerifyTotpRequest{OtpCode: "123456"}
 	err := useCase.VerifyTotp(userWithSecret.ID, req)
 
 	if err != nil {
@@ -1200,8 +1200,8 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1212,7 +1212,7 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{
+	req := &dto.VerifyTotpRequest{
 		OtpCode: "123456",
 	}
 
@@ -1227,8 +1227,8 @@ func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1239,7 +1239,7 @@ func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{
+	req := &dto.VerifyTotpRequest{
 		OtpCode: "123456",
 	}
 
@@ -1254,8 +1254,8 @@ func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1266,7 +1266,7 @@ func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{
+	req := &dto.VerifyTotpRequest{
 		OtpCode: "123456",
 	}
 
@@ -1281,8 +1281,8 @@ func TestAuthUseCase_VerifyTotp_InvalidOtpCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1297,7 +1297,7 @@ func TestAuthUseCase_VerifyTotp_InvalidOtpCode(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.VerifyTotpRequest{
+	req := &dto.VerifyTotpRequest{
 		OtpCode: "123456",
 	}
 
@@ -1312,8 +1312,8 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1338,7 +1338,7 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "123456",
 		CurrentPassword: "password123",
 	}
@@ -1354,8 +1354,8 @@ func TestAuthUseCase_DisableTotp_CacheInvalidation(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1378,7 +1378,7 @@ func TestAuthUseCase_DisableTotp_CacheInvalidation(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "123456",
 		CurrentPassword: "password123",
 	}
@@ -1394,8 +1394,8 @@ func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1406,7 +1406,7 @@ func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "123456",
 		CurrentPassword: "password123",
 	}
@@ -1422,8 +1422,8 @@ func TestAuthUseCase_DisableTotp_AlreadyDisabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1434,7 +1434,7 @@ func TestAuthUseCase_DisableTotp_AlreadyDisabled(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "123456",
 		CurrentPassword: "password123",
 	}
@@ -1450,8 +1450,8 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1466,7 +1466,7 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "123456",
 		CurrentPassword: "wrong",
 	}
@@ -1482,8 +1482,8 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	blacklistService := NewMockBlacklist(ctrl)
@@ -1498,7 +1498,7 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 
 	useCase := usecase.NewAuthUseCase(mockUserUseCase, mockOutboxRepo, mockTotpService, mockCache, blacklistService)
 
-	req := &entity.DisableTotpRequest{
+	req := &dto.DisableTotpRequest{
 		OtpCode:         "000000",
 		CurrentPassword: "password123",
 	}
@@ -1514,8 +1514,8 @@ func TestAuthUseCase_Logout_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserUseCase := NewMockUserUseCaseInterface(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockUserUseCase := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockTotpService := NewMockTotpService(ctrl)
 	mockCache := NewMockCache(ctrl)
 	mockBlacklist := NewMockBlacklist(ctrl)

@@ -10,38 +10,38 @@
 package mocks
 
 import (
-	entity "BookingGo/internal/entity"
+	domain "BookingGo/internal/domain"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockNotificationRepository is a mock of NotificationRepository interface.
-type MockNotificationRepository struct {
+// MockNotificationPostgres is a mock of NotificationPostgres interface.
+type MockNotificationPostgres struct {
 	ctrl     *gomock.Controller
-	recorder *MockNotificationRepositoryMockRecorder
+	recorder *MockNotificationPostgresMockRecorder
 	isgomock struct{}
 }
 
-// MockNotificationRepositoryMockRecorder is the mock recorder for MockNotificationRepository.
-type MockNotificationRepositoryMockRecorder struct {
-	mock *MockNotificationRepository
+// MockNotificationPostgresMockRecorder is the mock recorder for MockNotificationPostgres.
+type MockNotificationPostgresMockRecorder struct {
+	mock *MockNotificationPostgres
 }
 
-// NewMockNotificationRepository creates a new mock instance.
-func NewMockNotificationRepository(ctrl *gomock.Controller) *MockNotificationRepository {
-	mock := &MockNotificationRepository{ctrl: ctrl}
-	mock.recorder = &MockNotificationRepositoryMockRecorder{mock}
+// NewMockNotificationPostgres creates a new mock instance.
+func NewMockNotificationPostgres(ctrl *gomock.Controller) *MockNotificationPostgres {
+	mock := &MockNotificationPostgres{ctrl: ctrl}
+	mock.recorder = &MockNotificationPostgresMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNotificationRepository) EXPECT() *MockNotificationRepositoryMockRecorder {
+func (m *MockNotificationPostgres) EXPECT() *MockNotificationPostgresMockRecorder {
 	return m.recorder
 }
 
 // CreateNotif mocks base method.
-func (m *MockNotificationRepository) CreateNotif(notification *entity.Notification) error {
+func (m *MockNotificationPostgres) CreateNotif(notification *domain.Notification) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateNotif", notification)
 	ret0, _ := ret[0].(error)
@@ -49,28 +49,28 @@ func (m *MockNotificationRepository) CreateNotif(notification *entity.Notificati
 }
 
 // CreateNotif indicates an expected call of CreateNotif.
-func (mr *MockNotificationRepositoryMockRecorder) CreateNotif(notification any) *gomock.Call {
+func (mr *MockNotificationPostgresMockRecorder) CreateNotif(notification any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotif", reflect.TypeOf((*MockNotificationRepository)(nil).CreateNotif), notification)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotif", reflect.TypeOf((*MockNotificationPostgres)(nil).CreateNotif), notification)
 }
 
 // GetAllNotificationsByUserID mocks base method.
-func (m *MockNotificationRepository) GetAllNotificationsByUserID(userID int) ([]entity.Notification, error) {
+func (m *MockNotificationPostgres) GetAllNotificationsByUserID(userID int) ([]domain.Notification, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllNotificationsByUserID", userID)
-	ret0, _ := ret[0].([]entity.Notification)
+	ret0, _ := ret[0].([]domain.Notification)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAllNotificationsByUserID indicates an expected call of GetAllNotificationsByUserID.
-func (mr *MockNotificationRepositoryMockRecorder) GetAllNotificationsByUserID(userID any) *gomock.Call {
+func (mr *MockNotificationPostgresMockRecorder) GetAllNotificationsByUserID(userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllNotificationsByUserID", reflect.TypeOf((*MockNotificationRepository)(nil).GetAllNotificationsByUserID), userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllNotificationsByUserID", reflect.TypeOf((*MockNotificationPostgres)(nil).GetAllNotificationsByUserID), userID)
 }
 
 // MarkAllAsRead mocks base method.
-func (m *MockNotificationRepository) MarkAllAsRead(recipientID int) error {
+func (m *MockNotificationPostgres) MarkAllAsRead(recipientID int) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MarkAllAsRead", recipientID)
 	ret0, _ := ret[0].(error)
@@ -78,13 +78,13 @@ func (m *MockNotificationRepository) MarkAllAsRead(recipientID int) error {
 }
 
 // MarkAllAsRead indicates an expected call of MarkAllAsRead.
-func (mr *MockNotificationRepositoryMockRecorder) MarkAllAsRead(recipientID any) *gomock.Call {
+func (mr *MockNotificationPostgresMockRecorder) MarkAllAsRead(recipientID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAllAsRead", reflect.TypeOf((*MockNotificationRepository)(nil).MarkAllAsRead), recipientID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAllAsRead", reflect.TypeOf((*MockNotificationPostgres)(nil).MarkAllAsRead), recipientID)
 }
 
 // UpdateSettings mocks base method.
-func (m *MockNotificationRepository) UpdateSettings(userID int, req *entity.NotificationSettings) error {
+func (m *MockNotificationPostgres) UpdateSettings(userID int, req *domain.NotificationSettings) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateSettings", userID, req)
 	ret0, _ := ret[0].(error)
@@ -92,7 +92,7 @@ func (m *MockNotificationRepository) UpdateSettings(userID int, req *entity.Noti
 }
 
 // UpdateSettings indicates an expected call of UpdateSettings.
-func (mr *MockNotificationRepositoryMockRecorder) UpdateSettings(userID, req any) *gomock.Call {
+func (mr *MockNotificationPostgresMockRecorder) UpdateSettings(userID, req any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSettings", reflect.TypeOf((*MockNotificationRepository)(nil).UpdateSettings), userID, req)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSettings", reflect.TypeOf((*MockNotificationPostgres)(nil).UpdateSettings), userID, req)
 }

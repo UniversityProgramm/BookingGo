@@ -1,11 +1,11 @@
 package app
 
 import (
+	"BookingGo/internal/adapter/postgres"
+	"BookingGo/internal/adapter/redis"
 	"BookingGo/internal/auth"
-	"BookingGo/internal/cache"
 	"BookingGo/internal/domain"
 	"BookingGo/internal/ratelimit"
-	"BookingGo/internal/repository"
 	"BookingGo/internal/totp"
 	"BookingGo/internal/usecase"
 	"BookingGo/internal/worker"
@@ -30,7 +30,7 @@ type Dependencies struct {
 type Workers struct {
 	OutboxWorker          *worker.OutboxWorker
 	ExternalBookingWorker *worker.ExternalBookingWorker
-	cacheService          cache.Cache
+	cacheService          redis.Cache
 }
 
 func (r *Workers) Close() {
@@ -48,7 +48,7 @@ func (r *Workers) Close() {
 
 	if r.cacheService != nil {
 		if err := r.cacheService.Close(); err != nil {
-			logger.Log.Warn("[app] Failed to close cache", "error", err.Error())
+			logger.Log.Warn("[app] Failed to close redis", "error", err.Error())
 		} else {
 			logger.Log.Info("[app] Cache connection closed")
 		}
@@ -82,14 +82,14 @@ func Init(router *gin.Engine) (*Workers, error) {
 	auth.InitAuth()
 	logger.Log.Info("[app] Auth initialized")
 
-	userRepo := repository.NewUserRepository(db.DB)
-	bookingRepo := repository.NewBookingRepository(db.DB)
-	notificationRepo := repository.NewNotificationRepository(db.DB)
-	outboxRepo := repository.NewOutboxRepository(db.DB)
+	userRepo := postgres.NewUserPostgres(db.DB)
+	bookingRepo := postgres.NewBookingPostgres(db.DB)
+	notificationRepo := postgres.NewNotificationPostgres(db.DB)
+	outboxRepo := postgres.NewOutboxPostgres(db.DB)
 	totpService := totp.NewTotpService("Booking OTP")
 	logger.Log.Info("[app] All repositories and services initialized")
 
-	cacheService := cache.Init()
+	cacheService := redis.Init()
 
 	rateLimiter := ratelimit.Init(cacheService)
 

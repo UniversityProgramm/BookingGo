@@ -3,7 +3,7 @@ package controller
 import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"errors"
@@ -28,7 +28,7 @@ func NewUserController(userUseCase *usecase.UserUseCase) *UserController {
 // @Tags         management
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {array}   entity.User              "Список пользователей"
+// @Success      200  {array}   domain.User              "Список пользователей"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
@@ -52,7 +52,7 @@ func (u UserController) GetAllUsers(c *gin.Context) {
 // @Tags         management
 // @Security     BearerAuth
 // @Param        id  path      int  true  "ID пользователя"
-// @Success      200  {object}  entity.User              "Данные пользователя"
+// @Success      200  {object}  domain.User              "Данные пользователя"
 // @Failure      400  {object}  map[string]string        "ID должен быть числом"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
@@ -92,7 +92,7 @@ func (u UserController) GetUserByID(c *gin.Context) {
 // @Tags         management
 // @Security     BearerAuth
 // @Param        email  path      string  true  "Email пользователя"
-// @Success      200  {object}  entity.User              "Данные пользователя"
+// @Success      200  {object}  domain.User              "Данные пользователя"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
 // @Failure      404  {object}  map[string]string        "Пользователь не найден"
@@ -124,15 +124,15 @@ func (u UserController) GetUserByEmail(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.CreateUserRequest  true  "Данные пользователя"
-// @Success      201      {object}  entity.User               "Созданный пользователь"
+// @Param        request  body      domain.CreateUserRequest  true  "Данные пользователя"
+// @Success      201      {object}  domain.User               "Созданный пользователь"
 // @Failure      400      {object}  map[string]string         "Неверный формат"
 // @Failure      401      {object}  map[string]string         "Требуется авторизация"
 // @Failure      403      {object}  map[string]string         "Доступ запрещён"
 // @Failure      500      {object}  map[string]string         "Внутренняя ошибка сервера"
 // @Router       /adminPanel/users [post]
 func (u UserController) CreateUser(c *gin.Context) {
-	var createRequest entity.CreateUserRequest
+	var createRequest dto.CreateUserRequest
 	if err := c.ShouldBindJSON(&createRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprint("Неверный формат данных", err.Error()),
@@ -159,8 +159,8 @@ func (u UserController) CreateUser(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id       path      int                          true  "ID пользователя"
-// @Param        request  body      entity.UpdateUserProfileRequest  true  "Данные для обновления"
-// @Success      200  {object}  entity.User              "Обновлённый пользователь"
+// @Param        request  body      domain.UpdateUserProfileRequest  true  "Данные для обновления"
+// @Success      200  {object}  domain.User              "Обновлённый пользователь"
 // @Failure      400  {object}  map[string]string        "Неверный формат / ID должен быть числом"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
@@ -177,7 +177,7 @@ func (u UserController) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var updateRequest entity.UpdateUserProfileRequest
+	var updateRequest dto.UpdateUserProfileRequest
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprint("Неверный формат данных", err.Error()),

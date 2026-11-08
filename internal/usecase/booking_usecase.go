@@ -1,9 +1,9 @@
 package usecase
 
 import (
-	"BookingGo/internal/cache"
+	"BookingGo/internal/adapter/redis"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
 	"context"
@@ -13,39 +13,39 @@ import (
 )
 
 //go:generate mockgen -source=booking_usecase.go -destination=mocks/booking_mocks.go -package=mocks
-type BookingRepository interface {
-	Create(ctx context.Context, booking *entity.Booking) error
+type BookingPostgres interface {
+	Create(ctx context.Context, booking *domain.Booking) error
 	IsSlotAvailable(ctx context.Context, start, end time.Time) (bool, error)
-	GetAllBookingsByUserID(id int) ([]entity.Booking, error)
-	GetBookingByID(id int) (*entity.Booking, error)
-	SetBookingComplete(bookingID int) (*entity.Booking, error)
-	SetBookingCancel(bookingID, userID int) (*entity.Booking, error)
-	GetAll() ([]entity.Booking, error)
+	GetAllBookingsByUserID(id int) ([]domain.Booking, error)
+	GetBookingByID(id int) (*domain.Booking, error)
+	SetBookingComplete(bookingID int) (*domain.Booking, error)
+	SetBookingCancel(bookingID, userID int) (*domain.Booking, error)
+	GetAll() ([]domain.Booking, error)
 }
 
-type OutboxRepository interface {
-	CreateEvent(event *entity.OutboxEvent) error
-	CreateEventContext(ctx context.Context, event *entity.OutboxEvent) error
+type OutboxPostgres interface {
+	CreateEvent(event *domain.OutboxEvent) error
+	CreateEventContext(ctx context.Context, event *domain.OutboxEvent) error
 }
 
 type BookingUseCase struct {
-	bookingRepo BookingRepository
-	userRepo    UserRepository
-	outboxRepo  OutboxRepository
-	cache       cache.Cache
+	bookingPostgres BookingPostgres
+	userPostgres    UserPostgres
+	outboxPostgres  OutboxPostgres
+	cache           redis.Cache
 }
 
-func NewBookingUseCase(bookingRepo BookingRepository, userRepo UserRepository, outboxRepo OutboxRepository, cache cache.Cache) *BookingUseCase {
-	return &BookingUseCase{bookingRepo: bookingRepo, userRepo: userRepo, outboxRepo: outboxRepo, cache: cache}
+func NewBookingUseCase(bookingPostgres BookingPostgres, userPostgres UserPostgres, outboxPostgres OutboxPostgres, cache redis.Cache) *BookingUseCase {
+	return &BookingUseCase{bookingPostgres: bookingPostgres, userPostgres: userPostgres, outboxPostgres: outboxPostgres, cache: cache}
 }
 
 func (b *BookingUseCase) invalidateSlotCache(ctx context.Context, t time.Time) {
 	prefix := fmt.Sprintf("slots:%s", t.Format("2006-01-02"))
 
 	if err := b.cache.DeleteByPrefix(ctx, prefix); err != nil {
-		logger.Log.Warn("[BookingUseCase] Failed to invalidate slot cache", "prefix", prefix, "error", err.Error())
+		logger.Log.Warn("[BookingUseCase] Failed to invalidate slot redis", "prefix", prefix, "error", err.Error())
 	} else {
-		logger.Log.Debug("[BookingUseCase] Slot cache invalidated")
+		logger.Log.Debug("[BookingUseCase] Slot redis invalidated")
 	}
 }
 
@@ -53,12 +53,12 @@ func (b *BookingUseCase) invalidateUserBookingsCache(ctx context.Context, userID
 	key := fmt.Sprintf("user:%d:bookings", userID)
 	err := b.cache.Delete(ctx, key)
 	if err != nil {
-		logger.Log.Error("[BookingUseCase] Failed to invalidate user bookings cache", "error", err.Error())
+		logger.Log.Error("[BookingUseCase] Failed to invalidate user bookings redis", "error", err.Error())
 	}
 }
 
-func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *entity.CreateBookingRequest) (*entity.Booking, error) {
-	user, err := b.userRepo.GetByIDContext(ctx, id)
+func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *dto.CreateBookingRequest) (*domain.Booking, error) {
+	user, err := b.userPostgres.GetByIDContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *entity.
 		return nil, domain.ErrSlotNotAvailable
 	}
 
-	booking := &entity.Booking{
+	booking := &domain.Booking{
 		UserID:             user.ID,
 		SlotStart:          req.SlotStart,
 		SlotEnd:            slotEnd,
@@ -86,7 +86,7 @@ func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *entity.
 		ProblemDescription: req.ProblemDescription,
 	}
 
-	err = b.bookingRepo.Create(ctx, booking)
+	err = b.bookingPostgres.Create(ctx, booking)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +98,11 @@ func (b *BookingUseCase) CreateBooking(ctx context.Context, id int, req *entity.
 		"user_id":    user.ID,
 		"booking_id": booking.ID,
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.NewBookingType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.NewBookingType, payload)
 	if err != nil {
 		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 	} else {
-		err = b.outboxRepo.CreateEventContext(ctx, outboxEvent)
+		err = b.outboxPostgres.CreateEventContext(ctx, outboxEvent)
 		if err != nil {
 			logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.NewBookingType, "error", err.Error())
 		}
@@ -117,13 +117,13 @@ func (b *BookingUseCase) IsSlotAvailableCached(ctx context.Context, start, end t
 	var available bool
 	err := b.cache.Get(ctx, key, &available)
 	if err == nil {
-		logger.Log.Debug("[BookingUseCase] Got slot cache ", "key", key)
+		logger.Log.Debug("[BookingUseCase] Got slot redis ", "key", key)
 		return available, nil
 	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
 		logger.Log.Debug("[BookingUseCase] Cache key not found", "key", key, "error", err.Error())
 	}
 
-	available, err = b.bookingRepo.IsSlotAvailable(ctx, start, end)
+	available, err = b.bookingPostgres.IsSlotAvailable(ctx, start, end)
 	if err != nil {
 		return false, err
 	}
@@ -135,19 +135,19 @@ func (b *BookingUseCase) IsSlotAvailableCached(ctx context.Context, start, end t
 	return available, nil
 }
 
-func (b *BookingUseCase) GetAllBookings(userID int) ([]entity.Booking, error) {
-	user, err := b.userRepo.GetByID(userID)
+func (b *BookingUseCase) GetAllBookings(userID int) ([]domain.Booking, error) {
+	user, err := b.userPostgres.GetByID(userID)
 	if err != nil {
 		return nil, err
 	}
 	if user.Role == enum.RoleClient {
 		return nil, domain.ErrOnlyForStaffOrAdmin
 	}
-	return b.bookingRepo.GetAll()
+	return b.bookingPostgres.GetAll()
 }
 
-func (b *BookingUseCase) CompleteBookingByID(bookingID int) (*entity.Booking, error) {
-	booking, err := b.bookingRepo.GetBookingByID(bookingID)
+func (b *BookingUseCase) CompleteBookingByID(bookingID int) (*domain.Booking, error) {
+	booking, err := b.bookingPostgres.GetBookingByID(bookingID)
 	if err != nil {
 		return nil, err
 	}
@@ -160,32 +160,32 @@ func (b *BookingUseCase) CompleteBookingByID(bookingID int) (*entity.Booking, er
 		"user_id":    booking.UserID,
 		"booking_id": booking.ID,
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.CompleteBookingType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.CompleteBookingType, payload)
 	if err != nil {
 		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.CompleteBookingType, "error", err.Error())
 	} else {
-		err = b.outboxRepo.CreateEvent(outboxEvent)
+		err = b.outboxPostgres.CreateEvent(outboxEvent)
 		if err != nil {
 			logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.CompleteBookingType, "error", err.Error())
 		}
 	}
 
-	return b.bookingRepo.SetBookingComplete(bookingID)
+	return b.bookingPostgres.SetBookingComplete(bookingID)
 }
 
-func (b *BookingUseCase) GetMyBookings(userID int) ([]entity.Booking, error) {
+func (b *BookingUseCase) GetMyBookings(userID int) ([]domain.Booking, error) {
 	key := fmt.Sprintf("user:%d:bookings", userID)
 
-	var myBookings []entity.Booking
+	var myBookings []domain.Booking
 	err := b.cache.Get(context.Background(), key, &myBookings)
 	if err == nil {
-		logger.Log.Debug("[BookingUseCase] Got bookings cache for user", "key", key)
+		logger.Log.Debug("[BookingUseCase] Got bookings redis for user", "key", key)
 		return myBookings, nil
 	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
 		logger.Log.Debug("[BookingUseCase] Cache key not found", "key", key, "error", err.Error())
 	}
 
-	myBookings, err = b.bookingRepo.GetAllBookingsByUserID(userID)
+	myBookings, err = b.bookingPostgres.GetAllBookingsByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (b *BookingUseCase) GetMyBookings(userID int) ([]entity.Booking, error) {
 }
 
 func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
-	booking, err := b.bookingRepo.GetBookingByID(bookingID)
+	booking, err := b.bookingPostgres.GetBookingByID(bookingID)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
 		return domain.ErrBookingIsActive
 	}
 
-	_, err = b.bookingRepo.SetBookingCancel(bookingID, userID)
+	_, err = b.bookingPostgres.SetBookingCancel(bookingID, userID)
 	if err != nil {
 		return err
 	}
@@ -219,11 +219,11 @@ func (b *BookingUseCase) CancelMyBooking(bookingID, userID int) error {
 		"user_id":    userID,
 		"booking_id": bookingID,
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.CancelBookingType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.CancelBookingType, payload)
 	if err != nil {
 		logger.Log.Error("[BookingUseCase] Failed to create outboxEvent", "eventType", enum.CancelBookingType, "error", err.Error())
 	} else {
-		err = b.outboxRepo.CreateEvent(outboxEvent)
+		err = b.outboxPostgres.CreateEvent(outboxEvent)
 		if err != nil {
 			logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.CancelBookingType, "error", err.Error())
 		}

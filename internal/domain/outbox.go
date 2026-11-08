@@ -1,4 +1,4 @@
-package entity
+package domain
 
 import (
 	"BookingGo/internal/enum"

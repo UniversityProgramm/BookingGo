@@ -1,10 +1,10 @@
 package usecase
 
 import (
+	"BookingGo/internal/adapter/redis"
 	"BookingGo/internal/auth"
-	"BookingGo/internal/cache"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
 	"context"
@@ -15,43 +15,33 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-//go:generate mockgen -source=auth_usecase.go -destination=mocks/auth_mocks.go -package=mocks
-type UserUseCaseInterface interface {
-	GetUserByEmail(email string) (*entity.User, error)
-	CreateUser(req *entity.CreateUserRequest) (*entity.User, error)
-	GetUserByID(id int) (*entity.User, error)
-	UpdateUserProfile(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error)
-	UpdateUserData(id int, updates map[string]any) (*entity.User, error)
-	EmailExists(email string) (bool, error)
-}
-
 type TotpService interface {
 	GenerateSecret(email string) (string, string, error)
 	ValidateCode(secret, code string) bool
 }
 
 type AuthUseCase struct {
-	userUseCase UserUseCaseInterface
-	outboxRepo  OutboxRepository
-	totpService TotpService
-	cache       cache.Cache
-	blacklist   auth.Blacklist
+	userPostgres   UserPostgres
+	outboxPostgres OutboxPostgres
+	totpService    TotpService
+	cache          redis.Cache
+	blacklist      auth.Blacklist
 }
 
-func NewAuthUseCase(userUseCase UserUseCaseInterface, outboxRepo OutboxRepository, totpService TotpService, cache cache.Cache, blacklist auth.Blacklist) *AuthUseCase {
-	return &AuthUseCase{userUseCase: userUseCase, outboxRepo: outboxRepo, totpService: totpService, cache: cache, blacklist: blacklist}
+func NewAuthUseCase(userPostgres UserPostgres, outboxPostgres OutboxPostgres, totpService TotpService, cache redis.Cache, blacklist auth.Blacklist) *AuthUseCase {
+	return &AuthUseCase{userPostgres: userPostgres, outboxPostgres: outboxPostgres, totpService: totpService, cache: cache, blacklist: blacklist}
 }
 
 func (a *AuthUseCase) invalidateUserCache(ctx context.Context, userID int) {
 	key := fmt.Sprintf("user:%d", userID)
 	err := a.cache.Delete(ctx, key)
 	if err != nil {
-		logger.Log.Error("[AuthUseCase] Failed to invalidate user cache", "error", err.Error())
+		logger.Log.Error("[AuthUseCase] Failed to invalidate user redis", "error", err.Error())
 	}
 }
 
-func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
-	user, err := a.userUseCase.GetUserByEmail(req.Email)
+func (a *AuthUseCase) Login(req *dto.LoginUserRequest) (string, error) {
+	user, err := a.userPostgres.GetByEmail(req.Email)
 	if err != nil {
 		return "", domain.ErrInvalidEmail
 	}
@@ -71,11 +61,11 @@ func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
 		"booking_id": -1,
 		"ip":         "127.0.0.1",
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.AuthType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.AuthType, payload)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to create outboxEvent", "eventType", enum.AuthType, "error", err.Error())
 	} else {
-		err = a.outboxRepo.CreateEvent(outboxEvent)
+		err = a.outboxPostgres.CreateEvent(outboxEvent)
 		if err != nil {
 			logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.AuthType, "error", err.Error())
 		}
@@ -84,9 +74,33 @@ func (a *AuthUseCase) Login(req *entity.LoginUserRequest) (string, error) {
 	return token, nil
 }
 
-func (a *AuthUseCase) Register(req *entity.CreateUserRequest) (string, error) {
-	user, err := a.userUseCase.CreateUser(req)
+func (a *AuthUseCase) Register(req *dto.CreateUserRequest) (string, error) {
+	exists, err := a.userPostgres.EmailExists(req.Email)
 	if err != nil {
+		return "", err
+	}
+	if exists {
+		return "", domain.ErrEmailTaken
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	user := &domain.User{
+		Email:        req.Email,
+		PasswordHash: string(passwordHash),
+		FIO:          req.FIO,
+		Phone:        req.Phone,
+		Role:         enum.RoleClient,
+		IsActive:     true,
+		UserNotificationSettings: domain.NotificationSettings{
+			IsEmailSend: true,
+			IsPhoneSend: false,
+		},
+	}
+	if err := a.userPostgres.Create(user); err != nil {
 		return "", err
 	}
 
@@ -107,19 +121,19 @@ func (a *AuthUseCase) Logout(userID int, jti string, expiresAt time.Time) error 
 	return nil
 }
 
-func (a *AuthUseCase) GetMe(userID int) (*entity.User, error) {
+func (a *AuthUseCase) GetMe(userID int) (*domain.User, error) {
 	key := fmt.Sprintf("user:%d", userID)
 
-	var cachedUser entity.User
+	var cachedUser domain.User
 	err := a.cache.Get(context.Background(), key, &cachedUser)
 	if err == nil {
-		logger.Log.Debug("[AuthUseCase] Got user cache ", "key", key)
+		logger.Log.Debug("[AuthUseCase] Got user redis ", "key", key)
 		return &cachedUser, nil
 	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
 		logger.Log.Debug("[AuthUseCase] Cache key not found", "key", key, "error", err.Error())
 	}
 
-	user, err := a.userUseCase.GetUserByID(userID)
+	user, err := a.userPostgres.GetByID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,18 +145,27 @@ func (a *AuthUseCase) GetMe(userID int) (*entity.User, error) {
 	return user, nil
 }
 
-func (a *AuthUseCase) UpdateMe(userID int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
-	user, err := a.userUseCase.UpdateUserProfile(userID, req)
+func (a *AuthUseCase) UpdateMe(userID int, req *dto.UpdateUserProfileRequest) (*domain.User, error) {
+	updates := map[string]any{}
+	if req.FIO != nil {
+		updates["fio"] = *req.FIO
+	}
+	if req.Phone != nil {
+		updates["phone"] = *req.Phone
+	}
+
+	user, err := a.userPostgres.Update(userID, updates)
 	if err != nil {
 		return nil, err
 	}
+
 	a.invalidateUserCache(context.Background(), userID)
 
 	return user, nil
 }
 
-func (a *AuthUseCase) ChangePassword(userID int, req *entity.ChangePasswordRequest) error {
-	user, err := a.userUseCase.GetUserByID(userID)
+func (a *AuthUseCase) ChangePassword(userID int, req *dto.ChangePasswordRequest) error {
+	user, err := a.userPostgres.GetByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -174,7 +197,9 @@ func (a *AuthUseCase) ChangePassword(userID int, req *entity.ChangePasswordReque
 	updates := map[string]any{
 		"password_hash": string(newHashPassword),
 	}
-	_, err = a.userUseCase.UpdateUserData(user.ID, updates)
+
+	_, err = a.userPostgres.Update(user.ID, updates)
+
 	if err != nil {
 		return err
 	}
@@ -188,12 +213,12 @@ func (a *AuthUseCase) ChangePassword(userID int, req *entity.ChangePasswordReque
 		"booking_id": -1,
 		"ip":         "127.0.0.1",
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.ChangePasswordType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.ChangePasswordType, payload)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to create outboxEvent", "eventType", enum.ChangePasswordType, "error", err.Error())
 	}
 
-	err = a.outboxRepo.CreateEvent(outboxEvent)
+	err = a.outboxPostgres.CreateEvent(outboxEvent)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.ChangePasswordType, "error", err.Error())
 	}
@@ -201,13 +226,13 @@ func (a *AuthUseCase) ChangePassword(userID int, req *entity.ChangePasswordReque
 	return err
 }
 
-func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*entity.User, error) {
-	user, err := a.userUseCase.GetUserByID(userID)
+func (a *AuthUseCase) ChangeEmail(userID int, req *dto.ChangeEmailRequest) (*domain.User, error) {
+	user, err := a.userPostgres.GetByID(userID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
 
-	exists, err := a.userUseCase.EmailExists(req.NewEmail)
+	exists, err := a.userPostgres.EmailExists(req.NewEmail)
 	if exists {
 		return nil, domain.ErrEmailTaken
 	}
@@ -232,7 +257,7 @@ func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*
 	updates := map[string]any{
 		"email": req.NewEmail,
 	}
-	updatedUser, err := a.userUseCase.UpdateUserData(user.ID, updates)
+	updatedUser, err := a.userPostgres.Update(user.ID, updates)
 	if err != nil {
 		return nil, err
 	}
@@ -248,12 +273,12 @@ func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*
 		"booking_id": -1,
 		"ip":         "127.0.0.1",
 	}
-	outboxEvent, err := entity.NewOutboxEvent(enum.ChangeEmailType, payload)
+	outboxEvent, err := domain.NewOutboxEvent(enum.ChangeEmailType, payload)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to create outboxEvent", "eventType", enum.ChangeEmailType, "error", err.Error())
 	}
 
-	err = a.outboxRepo.CreateEvent(outboxEvent)
+	err = a.outboxPostgres.CreateEvent(outboxEvent)
 	if err != nil {
 		logger.Log.Error("[AuthUseCase] Failed to write outboxEvent", "eventType", enum.ChangeEmailType, "error", err.Error())
 	}
@@ -262,7 +287,7 @@ func (a *AuthUseCase) ChangeEmail(userID int, req *entity.ChangeEmailRequest) (*
 }
 
 func (a *AuthUseCase) SetupTotp(id int) (string, error) {
-	user, err := a.userUseCase.GetUserByID(id)
+	user, err := a.userPostgres.GetByID(id)
 	if err != nil {
 		return "", domain.ErrUserNotFound
 	}
@@ -274,11 +299,12 @@ func (a *AuthUseCase) SetupTotp(id int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	updates := map[string]any{
 		"totp_secret": secret,
 	}
 
-	_, err = a.userUseCase.UpdateUserData(user.ID, updates)
+	_, err = a.userPostgres.Update(user.ID, updates)
 	if err != nil {
 		return "", err
 	}
@@ -286,8 +312,8 @@ func (a *AuthUseCase) SetupTotp(id int) (string, error) {
 	return otpUrl, nil
 }
 
-func (a *AuthUseCase) VerifyTotp(userID int, req *entity.VerifyTotpRequest) error {
-	user, err := a.userUseCase.GetUserByID(userID)
+func (a *AuthUseCase) VerifyTotp(userID int, req *dto.VerifyTotpRequest) error {
+	user, err := a.userPostgres.GetByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -305,7 +331,8 @@ func (a *AuthUseCase) VerifyTotp(userID int, req *entity.VerifyTotpRequest) erro
 	updates := map[string]any{
 		"is_totp_enabled": true,
 	}
-	_, err = a.userUseCase.UpdateUserData(user.ID, updates)
+
+	_, err = a.userPostgres.Update(user.ID, updates)
 	if err != nil {
 		return err
 	}
@@ -315,8 +342,8 @@ func (a *AuthUseCase) VerifyTotp(userID int, req *entity.VerifyTotpRequest) erro
 	return nil
 }
 
-func (a *AuthUseCase) DisableTotp(userID int, req *entity.DisableTotpRequest) error {
-	user, err := a.userUseCase.GetUserByID(userID)
+func (a *AuthUseCase) DisableTotp(userID int, req *dto.DisableTotpRequest) error {
+	user, err := a.userPostgres.GetByID(userID)
 	if err != nil {
 		return domain.ErrUserNotFound
 	}
@@ -339,7 +366,8 @@ func (a *AuthUseCase) DisableTotp(userID int, req *entity.DisableTotpRequest) er
 	updates := map[string]any{
 		"is_totp_enabled": false,
 	}
-	_, err = a.userUseCase.UpdateUserData(user.ID, updates)
+	_, err = a.userPostgres.Update(user.ID, updates)
+
 	if err != nil {
 		return err
 	}

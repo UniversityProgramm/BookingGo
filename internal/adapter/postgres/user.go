@@ -1,34 +1,33 @@
-package repository
+package postgres
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
 	"context"
 	"errors"
 
 	"gorm.io/gorm"
 )
 
-type UserRepository struct {
+type UserPostgres struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(DB *gorm.DB) *UserRepository {
-	return &UserRepository{db: DB}
+func NewUserPostgres(DB *gorm.DB) *UserPostgres {
+	return &UserPostgres{db: DB}
 }
 
-func (r *UserRepository) GetAll() ([]entity.User, error) {
-	var users []entity.User
+func (r *UserPostgres) GetAll() ([]domain.User, error) {
+	var users []domain.User
 	result := r.db.Find(&users)
 	return users, result.Error
 }
 
-func (r *UserRepository) GetByID(id int) (*entity.User, error) {
+func (r *UserPostgres) GetByID(id int) (*domain.User, error) {
 	return r.GetByIDContext(context.Background(), id)
 }
 
-func (r *UserRepository) GetByIDContext(ctx context.Context, id int) (*entity.User, error) {
-	var user entity.User
+func (r *UserPostgres) GetByIDContext(ctx context.Context, id int) (*domain.User, error) {
+	var user domain.User
 	result := r.db.WithContext(ctx).First(&user, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
@@ -40,12 +39,12 @@ func (r *UserRepository) GetByIDContext(ctx context.Context, id int) (*entity.Us
 	return &user, nil
 }
 
-func (r *UserRepository) GetByEmail(email string) (*entity.User, error) {
+func (r *UserPostgres) GetByEmail(email string) (*domain.User, error) {
 	return r.GetByEmailContext(context.Background(), email)
 }
 
-func (r *UserRepository) GetByEmailContext(ctx context.Context, email string) (*entity.User, error) {
-	var user entity.User
+func (r *UserPostgres) GetByEmailContext(ctx context.Context, email string) (*domain.User, error) {
+	var user domain.User
 	result := r.db.WithContext(ctx).Where("email = ?", email).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
@@ -57,13 +56,13 @@ func (r *UserRepository) GetByEmailContext(ctx context.Context, email string) (*
 	return &user, nil
 }
 
-func (r *UserRepository) Create(user *entity.User) error {
+func (r *UserPostgres) Create(user *domain.User) error {
 	result := r.db.Create(user)
 	return result.Error
 }
 
-func (r *UserRepository) Update(id int, requestUser map[string]any) (*entity.User, error) {
-	result := r.db.Model(&entity.User{}).Where("id = ?", id).Updates(requestUser)
+func (r *UserPostgres) Update(id int, requestUser map[string]any) (*domain.User, error) {
+	result := r.db.Model(&domain.User{}).Where("id = ?", id).Updates(requestUser)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -74,8 +73,8 @@ func (r *UserRepository) Update(id int, requestUser map[string]any) (*entity.Use
 	return r.GetByID(id)
 }
 
-func (r *UserRepository) Delete(id int) error {
-	err := r.db.Delete(&entity.User{}, id)
+func (r *UserPostgres) Delete(id int) error {
+	err := r.db.Delete(&domain.User{}, id)
 	if err.Error != nil {
 		return err.Error
 	}
@@ -86,9 +85,9 @@ func (r *UserRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *UserRepository) EmailExists(email string) (bool, error) {
+func (r *UserPostgres) EmailExists(email string) (bool, error) {
 	var count int64
-	err := r.db.Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
+	err := r.db.Model(&domain.User{}).Where("email = ?", email).Count(&count).Error
 	if err != nil {
 		return false, err
 	}

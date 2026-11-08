@@ -2,7 +2,7 @@ package stubs
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -13,19 +13,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type StubUserUseCase struct {
-	GetUserByEmailFunc        func(email string) (*entity.User, error)
-	CreateUserFunc            func(req *entity.CreateUserRequest) (*entity.User, error)
-	GetUserByIDFunc           func(id int) (*entity.User, error)
-	UpdateUserProfileFunc     func(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error)
-	UpdateUserDataFunc        func(id int, updates map[string]any) (*entity.User, error)
-	EmailExistsFunc           func(email string) (bool, error)
-	GetUserByEmailContextFunc func(ctx context.Context, email string) (*entity.User, error)
-}
-
-type StubOutboxRepository struct {
-	CreateEventFunc        func(event *entity.OutboxEvent) error
-	CreateEventContextFunc func(ctx context.Context, event *entity.OutboxEvent) error
+type StubOutboxPostgres struct {
+	CreateEventFunc        func(event *domain.OutboxEvent) error
+	CreateEventContextFunc func(ctx context.Context, event *domain.OutboxEvent) error
 }
 
 type StubTotpService struct {
@@ -50,64 +40,14 @@ type StubBlacklistService struct {
 	IsSessionValidFunc        func(ctx context.Context, userID int, issuedAt time.Time) bool
 }
 
-func (m *StubUserUseCase) GetUserByEmail(email string) (*entity.User, error) {
-	if m.GetUserByEmailFunc != nil {
-		return m.GetUserByEmailFunc(email)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) GetUserByEmailContext(ctx context.Context, email string) (*entity.User, error) {
-	if m.GetUserByEmailContextFunc != nil {
-		return m.GetUserByEmailContextFunc(ctx, email)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) CreateUser(req *entity.CreateUserRequest) (*entity.User, error) {
-	if m.CreateUserFunc != nil {
-		return m.CreateUserFunc(req)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) GetUserByID(id int) (*entity.User, error) {
-	if m.GetUserByIDFunc != nil {
-		return m.GetUserByIDFunc(id)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) UpdateUserProfile(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
-	if m.UpdateUserProfileFunc != nil {
-		return m.UpdateUserProfileFunc(id, req)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) UpdateUserData(id int, updates map[string]any) (*entity.User, error) {
-	if m.UpdateUserDataFunc != nil {
-		return m.UpdateUserDataFunc(id, updates)
-	}
-	return nil, domain.ErrNotImplemented
-}
-
-func (m *StubUserUseCase) EmailExists(email string) (bool, error) {
-	if m.EmailExistsFunc != nil {
-		return m.EmailExistsFunc(email)
-	}
-
-	return false, domain.ErrNotImplemented
-}
-
-func (m *StubOutboxRepository) CreateEvent(event *entity.OutboxEvent) error {
+func (m *StubOutboxPostgres) CreateEvent(event *domain.OutboxEvent) error {
 	if m.CreateEventFunc != nil {
 		return m.CreateEventFunc(event)
 	}
 	return nil
 }
 
-func (m *StubOutboxRepository) CreateEventContext(ctx context.Context, event *entity.OutboxEvent) error {
+func (m *StubOutboxPostgres) CreateEventContext(ctx context.Context, event *domain.OutboxEvent) error {
 	if m.CreateEventContextFunc != nil {
 		return m.CreateEventContextFunc(ctx, event)
 	}
@@ -205,7 +145,7 @@ func (s *StubBlacklistService) IsSessionValid(ctx context.Context, userID int, i
 	return true
 }
 
-var testAuthUser = &entity.User{
+var testAuthUser = &domain.User{
 	ID:           1,
 	Email:        "test@example.com",
 	PasswordHash: "$2a$10$C1AtwB2zZtvq5llPqyEkY.YIDB28fNHrVUrcBN1F6CgEDb.YdU0qa", //password123
@@ -215,13 +155,13 @@ var testAuthUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
-	UserNotificationSettings: entity.NotificationSettings{
+	UserNotificationSettings: domain.NotificationSettings{
 		IsEmailSend: true,
 		IsPhoneSend: false,
 	},
 }
 
-var userWithTotp = &entity.User{
+var userWithTotp = &domain.User{
 	ID:            1,
 	IsTotpEnabled: true,
 	TotpSecret:    "SECRET123",
@@ -231,8 +171,8 @@ var userWithTotp = &entity.User{
 func TestAuthUseCase_Login_Success(t *testing.T) {
 	outboxCalled := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByEmailFunc: func(email string) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByEmailFunc: func(email string) (*domain.User, error) {
 			if email == "test@example.com" {
 				return testAuthUser, nil
 			}
@@ -240,8 +180,8 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
+	stubNotifier := &StubOutboxPostgres{
+		CreateEventFunc: func(event *domain.OutboxEvent) error {
 			outboxCalled = true
 			if event.EventType != string(enum.AuthType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
@@ -253,12 +193,12 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	loginReq := &entity.LoginUserRequest{
+	loginReq := &dto.LoginUserRequest{
 		Email:    "test@example.com",
 		Password: "password123",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	token, err := authUseCase.Login(loginReq)
 
 	if err != nil {
@@ -273,23 +213,23 @@ func TestAuthUseCase_Login_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByEmailFunc: func(email string) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByEmailFunc: func(email string) (*domain.User, error) {
 			return nil, domain.ErrInvalidEmail
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	loginReq := &entity.LoginUserRequest{
+	loginReq := &dto.LoginUserRequest{
 		Email:    "not_found@example.com",
 		Password: "password123",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.Login(loginReq)
 	if !errors.Is(err, domain.ErrInvalidEmail) {
 		t.Errorf("Ожидалась ошибка ErrInvalidEmail, получена: %v", err)
@@ -297,23 +237,23 @@ func TestAuthUseCase_Login_InvalidEmail(t *testing.T) {
 }
 
 func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByEmailFunc: func(email string) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByEmailFunc: func(email string) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	loginReq := &entity.LoginUserRequest{
+	loginReq := &dto.LoginUserRequest{
 		Email:    "test@example.com",
 		Password: "wrong_password",
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.Login(loginReq)
 	if !errors.Is(err, domain.ErrInvalidPassword) {
 		t.Errorf("Ожидалась ошибка ErrInvalidPassword, получена: %v", err)
@@ -321,28 +261,23 @@ func TestAuthUseCase_Login_InvalidPassword(t *testing.T) {
 }
 
 func TestAuthUseCase_Register_Success(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
-			return &entity.User{
-				ID:    2,
-				Email: req.Email,
-				FIO:   req.FIO,
-				Role:  enum.RoleClient,
-				UserNotificationSettings: entity.NotificationSettings{
-					IsEmailSend: true,
-					IsPhoneSend: false,
-				},
-			}, nil
+	stubUserPostgres := &StubUserPostgres{
+		EmailExistsFunc: func(email string) (bool, error) {
+			return false, nil
+		},
+		CreateFunc: func(user *domain.User) error {
+			user.ID = 2
+			return nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	token, err := authUseCase.Register(&entity.CreateUserRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	token, err := authUseCase.Register(&dto.CreateUserRequest{
 		Email:    "newuser@example.com",
 		Password: "qwerty12345",
 		FIO:      "new user",
@@ -358,19 +293,19 @@ func TestAuthUseCase_Register_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		CreateUserFunc: func(req *entity.CreateUserRequest) (*entity.User, error) {
-			return nil, domain.ErrEmailTaken
+	stubUserPostgres := &StubUserPostgres{
+		EmailExistsFunc: func(email string) (bool, error) {
+			return true, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.Register(&entity.CreateUserRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.Register(&dto.CreateUserRequest{
 		Email:    "taken@example.com",
 		Password: "qwerty123",
 		FIO:      "Test User",
@@ -382,18 +317,18 @@ func TestAuthUseCase_Register_EmailTaken(t *testing.T) {
 }
 
 func TestAuthUseCase_GetMe_Success(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -404,8 +339,8 @@ func TestAuthUseCase_GetMe_Success(t *testing.T) {
 func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 	dbCalled := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			dbCalled = true
 			return testAuthUser, nil
 		},
@@ -413,17 +348,17 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 
 	stubCache := &StubCacheService{
 		GetFunc: func(ctx context.Context, key string, dest any) error {
-			if userPtr, ok := dest.(*entity.User); ok {
+			if userPtr, ok := dest.(*domain.User); ok {
 				*userPtr = *testAuthUser
 			}
 			return nil
 		},
 	}
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -433,15 +368,15 @@ func TestAuthUseCase_GetMe_CacheHit(t *testing.T) {
 		t.Errorf("Ожидался email %s, получен %s", testAuthUser.Email, user.Email)
 	}
 	if dbCalled {
-		t.Error("GetUserByID не должен вызываться при cache hit")
+		t.Error("GetByID не должен вызываться при redis hit")
 	}
 }
 
 func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 	cacheSetCalled := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -455,11 +390,11 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 			return nil
 		},
 	}
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -469,13 +404,13 @@ func TestAuthUseCase_GetMe_CacheMiss(t *testing.T) {
 		t.Errorf("Ожидался email %s, получен %s", testAuthUser.Email, user.Email)
 	}
 	if !cacheSetCalled {
-		t.Error("Cache Set должен вызываться при cache miss")
+		t.Error("Cache Set должен вызываться при redis miss")
 	}
 }
 
 func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
@@ -485,14 +420,14 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 			return domain.ErrCacheKeyNotFound
 		},
 		SetFunc: func(ctx context.Context, key string, value any, ttl time.Duration) error {
-			return errors.New("cache error")
+			return errors.New("redis error")
 		},
 	}
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	user, err := authUseCase.GetMe(1)
 
 	if err != nil {
@@ -506,8 +441,8 @@ func TestAuthUseCase_GetMe_CacheSetError(t *testing.T) {
 func TestAuthUseCase_GetMe_UserNotFound_NoCacheSet(t *testing.T) {
 	cacheSetCalled := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -521,11 +456,11 @@ func TestAuthUseCase_GetMe_UserNotFound_NoCacheSet(t *testing.T) {
 			return nil
 		},
 	}
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCache, stubBlacklistService)
 	_, err := authUseCase.GetMe(999)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -537,18 +472,18 @@ func TestAuthUseCase_GetMe_UserNotFound_NoCacheSet(t *testing.T) {
 }
 
 func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.GetMe(1)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -559,13 +494,13 @@ func TestAuthUseCase_GetMe_UserNotFound(t *testing.T) {
 func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 	cacheUserInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		UpdateUserProfileFunc: func(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{
 		DeleteFunc: func(ctx context.Context, key string) error {
@@ -575,8 +510,8 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 	}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.UpdateMe(1, &dto.UpdateUserProfileRequest{
 		Phone: new("+79991234567"),
 	})
 
@@ -589,19 +524,19 @@ func TestAuthUseCase_UpdateMe_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_UpdateMe_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		UpdateUserProfileFunc: func(id int, req *entity.UpdateUserProfileRequest) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.UpdateMe(1, &entity.UpdateUserProfileRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.UpdateMe(1, &dto.UpdateUserProfileRequest{
 		Phone: new("+79991234567"),
 	})
 
@@ -615,11 +550,11 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 	outboxCalled := false
 	sessionsInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			passwordUpdated = true
 			if updates["password_hash"] == "" {
 				t.Error("password_hash не был обновлён")
@@ -628,8 +563,8 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
+	stubNotifier := &StubOutboxPostgres{
+		CreateEventFunc: func(event *domain.OutboxEvent) error {
 			outboxCalled = true
 			if event.EventType != string(enum.ChangePasswordType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
@@ -649,8 +584,8 @@ func TestAuthUseCase_ChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "new",
 	})
@@ -673,19 +608,19 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 	outboxCalled := false
 	sessionsInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["password_hash"] == "" {
 				t.Error("password_hash не был обновлён")
 			}
 			return userWithTotp, nil
 		},
 	}
-	stubNotifier := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
+	stubNotifier := &StubOutboxPostgres{
+		CreateEventFunc: func(event *domain.OutboxEvent) error {
 			outboxCalled = true
 			if event.EventType != string(enum.ChangePasswordType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
@@ -705,8 +640,8 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 			return nil
 		},
 	}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newSecurePass!",
 		OtpCode:         "123456",
@@ -724,19 +659,19 @@ func TestAuthUseCase_ChangePassword_WithTotp_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "old",
 		NewPassword:     "new",
 	})
@@ -747,19 +682,19 @@ func TestAuthUseCase_ChangePassword_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "wrong",
 		NewPassword:     "new",
 	})
@@ -770,19 +705,19 @@ func TestAuthUseCase_ChangePassword_InvalidCurrentPassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "password123",
 	})
@@ -793,18 +728,18 @@ func TestAuthUseCase_ChangePassword_SamePassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newpass",
 		OtpCode:         "",
@@ -816,12 +751,12 @@ func TestAuthUseCase_ChangePassword_TotpRequired(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return false
@@ -830,8 +765,8 @@ func TestAuthUseCase_ChangePassword_TotpInvalidCode(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.ChangePassword(1, &entity.ChangePasswordRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.ChangePassword(1, &dto.ChangePasswordRequest{
 		CurrentPassword: "password123",
 		NewPassword:     "newpass",
 		OtpCode:         "wrongcode",
@@ -847,14 +782,14 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 	outboxCalled := false
 	sessionsInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["email"] != "new@example.com" {
 				t.Errorf("Неверный email в updates: %v", updates["email"])
 			}
@@ -865,8 +800,8 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
+	stubNotifier := &StubOutboxPostgres{
+		CreateEventFunc: func(event *domain.OutboxEvent) error {
 			outboxCalled = true
 			if event.EventType != string(enum.ChangeEmailType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
@@ -892,8 +827,8 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 		},
 	}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
-	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotp, stubCacheService, stubBlacklistService)
+	updatedUser, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "123456",
@@ -919,14 +854,14 @@ func TestAuthUseCase_ChangeEmail_Success(t *testing.T) {
 func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 	sessionsInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["email"] != "new@example.com" {
 				t.Errorf("Неверный email в updates: %v", updates["email"])
 			}
@@ -937,8 +872,8 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 		},
 	}
 
-	stubOutbox := &StubOutboxRepository{
-		CreateEventFunc: func(event *entity.OutboxEvent) error {
+	stubOutbox := &StubOutboxPostgres{
+		CreateEventFunc: func(event *domain.OutboxEvent) error {
 			if event.EventType != string(enum.ChangeEmailType) {
 				t.Errorf("Неверный тип события: %s", event.EventType)
 			}
@@ -961,8 +896,8 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 			return nil
 		},
 	}
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	updatedUser, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	updatedUser, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "123456",
@@ -980,19 +915,19 @@ func TestAuthUseCase_ChangeEmail_WithTotp_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		ConfirmPassword: "old",
 		NewEmail:        "newemail@example.com",
 		OtpCode:         "111111",
@@ -1004,8 +939,8 @@ func TestAuthUseCase_ChangeEmail_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 		EmailExistsFunc: func(email string) (bool, error) {
@@ -1013,13 +948,13 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		ConfirmPassword: "wrong",
 		NewEmail:        "newemail@example.com",
 		OtpCode:         "111111",
@@ -1031,8 +966,8 @@ func TestAuthUseCase_ChangeEmail_InvalidCurrentPassword(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
 		EmailExistsFunc: func(email string) (bool, error) {
@@ -1040,13 +975,13 @@ func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
 		},
 	}
 
-	stubNotifier := &StubOutboxRepository{}
+	stubNotifier := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubNotifier, stubTotpService, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		ConfirmPassword: "password123",
 		NewEmail:        "newemail@example.com",
 	})
@@ -1057,21 +992,21 @@ func TestAuthUseCase_ChangeEmail_EmailExists(t *testing.T) {
 }
 
 func TestAuthUseCase_ChangeEmail_TotpRequired(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	_, err := authUseCase.ChangeEmail(1, &entity.ChangeEmailRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	_, err := authUseCase.ChangeEmail(1, &dto.ChangeEmailRequest{
 		NewEmail:        "new@example.com",
 		ConfirmPassword: "password123",
 		OtpCode:         "",
@@ -1086,18 +1021,18 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 	expectedSecret := "JBSWY3DPEHPK3PXP"
 	expectedURL := "otpauth://totp/BookingGo:test@example.com?secret=JBSWY3DPEHPK3PXP&issuer=BookingGo"
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testAuthUser, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["totp_secret"] != expectedSecret {
 				t.Errorf("Неверный секрет в updates: %v", updates["totp_secret"])
 			}
 			return testAuthUser, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		GenerateSecretFunc: func(email string) (string, string, error) {
 			if email != "test@example.com" {
@@ -1109,7 +1044,7 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	otpURL, err := authUseCase.SetupTotp(1)
 
 	if err != nil {
@@ -1121,17 +1056,17 @@ func TestAuthUseCase_SetupTotp_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.SetupTotp(999)
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
@@ -1140,17 +1075,17 @@ func TestAuthUseCase_SetupTotp_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
 	_, err := authUseCase.SetupTotp(1)
 
 	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
@@ -1161,23 +1096,23 @@ func TestAuthUseCase_SetupTotp_AlreadyEnabled(t *testing.T) {
 func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 	cacheUserInvalidated := false
 
-	userWithSecret := &entity.User{
+	userWithSecret := &domain.User{
 		ID:            1,
 		IsTotpEnabled: false,
 		TotpSecret:    "SECRET123",
 	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithSecret, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["is_totp_enabled"] != true {
 				t.Errorf("Ожидалось is_totp_enabled=true, получено: %v", updates["is_totp_enabled"])
 			}
 			return userWithSecret, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return secret == "SECRET123" && code == "123456"
@@ -1191,8 +1126,8 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 	}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.VerifyTotp(1, &dto.VerifyTotpRequest{OtpCode: "123456"})
 
 	if err != nil {
 		t.Fatalf("Ожидался успех, получена ошибка: %v", err)
@@ -1203,18 +1138,18 @@ func TestAuthUseCase_VerifyTotp_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.VerifyTotp(999, &entity.VerifyTotpRequest{OtpCode: "123456"})
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.VerifyTotp(999, &dto.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Ожидалась ошибка ErrUserNotFound, получена: %v", err)
@@ -1222,18 +1157,18 @@ func TestAuthUseCase_VerifyTotp_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.VerifyTotp(1, &dto.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrTotpAlreadyEnabled) {
 		t.Errorf("Ожидалась ошибка ErrTotpAlreadyEnabled, получена: %v", err)
@@ -1241,23 +1176,23 @@ func TestAuthUseCase_VerifyTotp_AlreadyEnabled(t *testing.T) {
 }
 
 func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
-	userWithoutSecret := &entity.User{
+	userWithoutSecret := &domain.User{
 		ID:            1,
 		IsTotpEnabled: false,
 		TotpSecret:    "",
 	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithoutSecret, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "123456"})
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.VerifyTotp(1, &dto.VerifyTotpRequest{OtpCode: "123456"})
 
 	if !errors.Is(err, domain.ErrTotpSecretNotSet) {
 		t.Errorf("Ожидалась ошибка ErrTotpSecretNotSet, получена: %v", err)
@@ -1265,17 +1200,17 @@ func TestAuthUseCase_VerifyTotp_SecretNotSet(t *testing.T) {
 }
 
 func TestAuthUseCase_VerifyTotp_InvalidCode(t *testing.T) {
-	userWithSecret := &entity.User{
+	userWithSecret := &domain.User{
 		ID:            1,
 		IsTotpEnabled: false,
 		TotpSecret:    "SECRET123",
 	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithSecret, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return false
@@ -1284,8 +1219,8 @@ func TestAuthUseCase_VerifyTotp_InvalidCode(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.VerifyTotp(1, &entity.VerifyTotpRequest{OtpCode: "wrongcode"})
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.VerifyTotp(1, &dto.VerifyTotpRequest{OtpCode: "wrongcode"})
 
 	if !errors.Is(err, domain.ErrInvalidTotpCode) {
 		t.Errorf("Ожидалась ошибка ErrInvalidTotpCode, получена: %v", err)
@@ -1295,18 +1230,18 @@ func TestAuthUseCase_VerifyTotp_InvalidCode(t *testing.T) {
 func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 	cacheUserInvalidated := false
 
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
-		UpdateUserDataFunc: func(id int, updates map[string]any) (*entity.User, error) {
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if updates["is_totp_enabled"] != false {
 				t.Errorf("Ожидалось is_totp_enabled=false, получено: %v", updates["is_totp_enabled"])
 			}
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return true
@@ -1320,8 +1255,8 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 	}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.DisableTotp(1, &dto.DisableTotpRequest{
 		CurrentPassword: "password123",
 		OtpCode:         "123456",
 	})
@@ -1335,18 +1270,18 @@ func TestAuthUseCase_DisableTotp_Success(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.DisableTotp(999, &entity.DisableTotpRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.DisableTotp(999, &dto.DisableTotpRequest{
 		CurrentPassword: "pass",
 		OtpCode:         "123456",
 	})
@@ -1357,22 +1292,22 @@ func TestAuthUseCase_DisableTotp_UserNotFound(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_NotEnabled(t *testing.T) {
-	userWithoutTotp := &entity.User{
+	userWithoutTotp := &domain.User{
 		ID:            1,
 		IsTotpEnabled: false,
 	}
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithoutTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.DisableTotp(1, &dto.DisableTotpRequest{
 		CurrentPassword: "pass",
 		OtpCode:         "123456",
 	})
@@ -1383,12 +1318,12 @@ func TestAuthUseCase_DisableTotp_NotEnabled(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return false
@@ -1397,8 +1332,8 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.DisableTotp(1, &dto.DisableTotpRequest{
 		CurrentPassword: "password123",
 		OtpCode:         "wrongcode",
 	})
@@ -1409,12 +1344,12 @@ func TestAuthUseCase_DisableTotp_InvalidOtpCode(t *testing.T) {
 }
 
 func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
-	stubUserUseCase := &StubUserUseCase{
-		GetUserByIDFunc: func(id int) (*entity.User, error) {
+	stubUserPostgres := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return userWithTotp, nil
 		},
 	}
-	stubOutbox := &StubOutboxRepository{}
+	stubOutbox := &StubOutboxPostgres{}
 	stubTotp := &StubTotpService{
 		ValidateCodeFunc: func(secret, code string) bool {
 			return true
@@ -1423,8 +1358,8 @@ func TestAuthUseCase_DisableTotp_WrongPassword(t *testing.T) {
 	stubCacheService := &StubCacheService{}
 	stubBlacklistService := &StubBlacklistService{}
 
-	authUseCase := usecase.NewAuthUseCase(stubUserUseCase, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
-	err := authUseCase.DisableTotp(1, &entity.DisableTotpRequest{
+	authUseCase := usecase.NewAuthUseCase(stubUserPostgres, stubOutbox, stubTotp, stubCacheService, stubBlacklistService)
+	err := authUseCase.DisableTotp(1, &dto.DisableTotpRequest{
 		CurrentPassword: "wrongpass",
 		OtpCode:         "123456",
 	})
@@ -1448,13 +1383,13 @@ func TestAuthUseCase_Logout_Success(t *testing.T) {
 		},
 	}
 
-	stubUserUseCase := &StubUserUseCase{}
-	stubOutboxRepo := &StubOutboxRepository{}
+	stubUserPostgres := &StubUserPostgres{}
+	stubOutboxRepo := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 
 	useCase := usecase.NewAuthUseCase(
-		stubUserUseCase,
+		stubUserPostgres,
 		stubOutboxRepo,
 		stubTotpService,
 		stubCacheService,
@@ -1490,13 +1425,13 @@ func TestAuthUseCase_Logout_BlacklistError(t *testing.T) {
 		},
 	}
 
-	stubUserUseCase := &StubUserUseCase{}
-	stubOutboxRepo := &StubOutboxRepository{}
+	stubUserPostgres := &StubUserPostgres{}
+	stubOutboxRepo := &StubOutboxPostgres{}
 	stubTotpService := &StubTotpService{}
 	stubCacheService := &StubCacheService{}
 
 	useCase := usecase.NewAuthUseCase(
-		stubUserUseCase,
+		stubUserPostgres,
 		stubOutboxRepo,
 		stubTotpService,
 		stubCacheService,

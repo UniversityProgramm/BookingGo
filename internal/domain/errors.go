@@ -56,7 +56,7 @@ var (
 
 // Cache
 var (
-	ErrCacheKeyNotFound = errors.New("cache key not found")
+	ErrCacheKeyNotFound = errors.New("redis key not found")
 )
 
 // Stubs

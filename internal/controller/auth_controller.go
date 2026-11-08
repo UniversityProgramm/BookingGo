@@ -3,7 +3,7 @@ package controller
 import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -25,14 +25,14 @@ func NewAuthController(authUseCase *usecase.AuthUseCase) *AuthController {
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.LoginUserRequest  true  "Данные для входа"
+// @Param        request  body      domain.LoginUserRequest  true  "Данные для входа"
 // @Success      200      {object}  map[string]string        "JWT токен"
 // @Failure      400      {object}  map[string]string        "Неверный формат данных"
 // @Failure      401      {object}  map[string]string        "Неверный email или пароль"
 // @Failure      500      {object}  map[string]string        "Внутренняя ошибка сервера"
 // @Router       /auth/login [post]
 func (ac *AuthController) Login(c *gin.Context) {
-	var req entity.LoginUserRequest
+	var req dto.LoginUserRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -60,13 +60,13 @@ func (ac *AuthController) Login(c *gin.Context) {
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.CreateUserRequest  true  "Данные пользователя"
+// @Param        request  body      domain.CreateUserRequest  true  "Данные пользователя"
 // @Success      201      {object}  map[string]string         "JWT токен"
 // @Failure      400      {object}  map[string]string         "Неверный формат или email занят"
 // @Failure      500      {object}  map[string]string         "Внутренняя ошибка сервера"
 // @Router       /auth/register [post]
 func (ac *AuthController) Register(c *gin.Context) {
-	var req entity.CreateUserRequest
+	var req dto.CreateUserRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -117,7 +117,7 @@ func (ac *AuthController) Logout(c *gin.Context) {
 // @Tags         profile
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {object}  entity.User              "Данные пользователя"
+// @Success      200  {object}  domain.User              "Данные пользователя"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      404  {object}  map[string]string        "Пользователь не найден"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
@@ -149,8 +149,8 @@ func (ac *AuthController) GetMe(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.UpdateUserProfileRequest  true  "Данные для обновления"
-// @Success      200      {object}  entity.User                      "Обновлённый пользователь"
+// @Param        request  body      domain.UpdateUserProfileRequest  true  "Данные для обновления"
+// @Success      200      {object}  domain.User                      "Обновлённый пользователь"
 // @Failure      400      {object}  map[string]string                "Неверный формат"
 // @Failure      401      {object}  map[string]string                "Требуется авторизация"
 // @Failure      404      {object}  map[string]string                "Пользователь не найден"
@@ -165,7 +165,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 	}
 
 	userID := currentUser.UserID
-	var req entity.UpdateUserProfileRequest
+	var req dto.UpdateUserProfileRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -193,7 +193,7 @@ func (ac *AuthController) UpdateMe(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.ChangePasswordRequest  true  "Текущий и новый пароль"
+// @Param        request  body      domain.ChangePasswordRequest  true  "Текущий и новый пароль"
 // @Success      200  {object}  map[string]string  "Пароль успешно изменён"
 // @Failure      400  {object}  map[string]string  "Неверный текущий пароль / новый пароль совпадает / неверный TOTP"
 // @Failure      401  {object}  map[string]string  "Требуется авторизация"
@@ -208,7 +208,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 	}
 
 	userID := currentUser.UserID
-	var req entity.ChangePasswordRequest
+	var req dto.ChangePasswordRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -238,7 +238,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.ChangeEmailRequest  true  "Новый email и подтверждение"
+// @Param        request  body      domain.ChangeEmailRequest  true  "Новый email и подтверждение"
 // @Success      200  {object}  map[string]interface{}  "Пользователь с новым email"
 // @Failure      400  {object}  map[string]string       "Неверный пароль / неверный TOTP"
 // @Failure      401  {object}  map[string]string       "Требуется авторизация"
@@ -254,7 +254,7 @@ func (ac *AuthController) ChangeEmail(c *gin.Context) {
 	}
 
 	userID := currentUser.UserID
-	var req entity.ChangeEmailRequest
+	var req dto.ChangeEmailRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -318,7 +318,7 @@ func (ac *AuthController) SetupTotp(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.VerifyTotpRequest  true  "Код TOTP"
+// @Param        request  body      domain.VerifyTotpRequest  true  "Код TOTP"
 // @Success      200  {object}  map[string]string  "2FA успешно включён"
 // @Failure      400  {object}  map[string]string  "Неверный код"
 // @Failure      401  {object}  map[string]string  "Требуется авторизация"
@@ -334,7 +334,7 @@ func (ac *AuthController) VerifyTotp(c *gin.Context) {
 		return
 	}
 
-	var req entity.VerifyTotpRequest
+	var req dto.VerifyTotpRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -366,7 +366,7 @@ func (ac *AuthController) VerifyTotp(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.DisableTotpRequest  true  "Код TOTP и пароль"
+// @Param        request  body      domain.DisableTotpRequest  true  "Код TOTP и пароль"
 // @Success      200  {object}  map[string]string  "2FA отключён"
 // @Failure      400  {object}  map[string]string  "Неверный код / пароль"
 // @Failure      401  {object}  map[string]string  "Требуется авторизация"
@@ -382,7 +382,7 @@ func (ac *AuthController) DisableTotp(c *gin.Context) {
 		return
 	}
 
-	var req entity.DisableTotpRequest
+	var req dto.DisableTotpRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return

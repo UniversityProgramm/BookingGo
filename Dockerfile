@@ -1,6 +1,6 @@
 FROM golang:1.26.2-alpine AS builder
 
-RUN apk add --no-cache git ca-certificates
+RUN apk add --no-redis git ca-certificates
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 go build -o main ./cmd/server/main.go
 
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-redis ca-certificates
 
 WORKDIR /app/
 

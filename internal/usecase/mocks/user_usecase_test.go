@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -13,7 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-var testUser = &entity.User{
+var testUser = &domain.User{
 	ID:           1,
 	Email:        "test@example.com",
 	PasswordHash: "hashed_password",
@@ -23,7 +23,7 @@ var testUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
-	UserNotificationSettings: entity.NotificationSettings{
+	UserNotificationSettings: domain.NotificationSettings{
 		IsEmailSend: true,
 		IsPhoneSend: false,
 	},
@@ -33,11 +33,11 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetAll().
-		Return([]entity.User{*testUser}, nil)
+		Return([]domain.User{*testUser}, nil)
 
 	useCase := usecase.NewUserUseCase(mockUserRepo)
 
@@ -51,7 +51,7 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(1).
@@ -75,7 +75,7 @@ func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(1).
@@ -93,7 +93,7 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByEmail(testUser.Email).
@@ -117,7 +117,7 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByEmail("not_exist_email@example.com").
@@ -135,7 +135,7 @@ func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByEmailContext(context.Background(), testUser.Email).
@@ -159,7 +159,7 @@ func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByEmailContext(context.Background(), "not_exist_email@example.com").
@@ -177,7 +177,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		EmailExists("new@example.com").
@@ -185,7 +185,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 
 	mockUserRepo.EXPECT().
 		Create(gomock.Any()).
-		DoAndReturn(func(user *entity.User) error {
+		DoAndReturn(func(user *domain.User) error {
 			if user.PasswordHash == "" {
 				t.Error("Password hash is empty")
 			}
@@ -198,7 +198,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 
 	useCase := usecase.NewUserUseCase(mockUserRepo)
 
-	req := &entity.CreateUserRequest{
+	req := &dto.CreateUserRequest{
 		Email:    "new@example.com",
 		Password: "password123",
 		FIO:      "Test User",
@@ -221,7 +221,7 @@ func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserRepo := NewMockUserRepository(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
 
 	mockUserRepo.EXPECT().
 		EmailExists("new@example.com").
@@ -229,7 +229,7 @@ func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
 
 	useCase := usecase.NewUserUseCase(mockUserRepo)
 
-	req := &entity.CreateUserRequest{
+	req := &dto.CreateUserRequest{
 		Email:    "new@example.com",
 		Password: "password123",
 		FIO:      "Test User",
@@ -246,15 +246,11 @@ func TestUserUseCase_UpdateUserProfile_Success_1(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newFIO := "Updated Name"
 	newPhone := "+79999999999"
-
-	mockRepo.EXPECT().
-		GetByID(userID).
-		Return(&entity.User{ID: userID, Email: "test@example.com"}, nil)
 
 	mockRepo.EXPECT().
 		Update(userID, gomock.Cond(func(updates map[string]any) bool {
@@ -266,7 +262,7 @@ func TestUserUseCase_UpdateUserProfile_Success_1(t *testing.T) {
 			}
 			return true
 		})).
-		Return(&entity.User{
+		Return(&domain.User{
 			ID:    userID,
 			FIO:   newFIO,
 			Phone: newPhone,
@@ -274,7 +270,7 @@ func TestUserUseCase_UpdateUserProfile_Success_1(t *testing.T) {
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 
-	req := &entity.UpdateUserProfileRequest{
+	req := &dto.UpdateUserProfileRequest{
 		FIO:   &newFIO,
 		Phone: &newPhone,
 	}
@@ -296,14 +292,10 @@ func TestUserUseCase_UpdateUserProfile_Success_2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newFIO := "Updated Name"
-
-	mockRepo.EXPECT().
-		GetByID(userID).
-		Return(&entity.User{ID: userID, Email: "test@example.com"}, nil)
 
 	mockRepo.EXPECT().
 		Update(userID, gomock.Cond(func(updates map[string]any) bool {
@@ -312,14 +304,14 @@ func TestUserUseCase_UpdateUserProfile_Success_2(t *testing.T) {
 			}
 			return true
 		})).
-		Return(&entity.User{
+		Return(&domain.User{
 			ID:  userID,
 			FIO: newFIO,
 		}, nil)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 
-	req := &entity.UpdateUserProfileRequest{
+	req := &dto.UpdateUserProfileRequest{
 		FIO: &newFIO,
 	}
 
@@ -337,14 +329,10 @@ func TestUserUseCase_UpdateUserProfile_Success_3(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newPhone := "+79999999999"
-
-	mockRepo.EXPECT().
-		GetByID(userID).
-		Return(&entity.User{ID: userID, Email: "test@example.com"}, nil)
 
 	mockRepo.EXPECT().
 		Update(userID, gomock.Cond(func(updates map[string]any) bool {
@@ -353,14 +341,14 @@ func TestUserUseCase_UpdateUserProfile_Success_3(t *testing.T) {
 			}
 			return true
 		})).
-		Return(&entity.User{
+		Return(&domain.User{
 			ID:    userID,
 			Phone: newPhone,
 		}, nil)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 
-	req := &entity.UpdateUserProfileRequest{
+	req := &dto.UpdateUserProfileRequest{
 		Phone: &newPhone,
 	}
 
@@ -378,18 +366,18 @@ func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newPhone := "+79999999999"
 
 	mockRepo.EXPECT().
-		GetByID(userID).
+		Update(userID, gomock.Any()).
 		Return(nil, domain.ErrUserNotFound)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
 
-	req := &entity.UpdateUserProfileRequest{
+	req := &dto.UpdateUserProfileRequest{
 		Phone: &newPhone,
 	}
 
@@ -404,14 +392,10 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newEmail := "new_email@example.com"
-
-	mockRepo.EXPECT().
-		GetByID(userID).
-		Return(&entity.User{ID: userID, Email: "test@example.com"}, nil)
 
 	mockRepo.EXPECT().
 		Update(userID, gomock.Cond(func(updates map[string]any) bool {
@@ -420,7 +404,7 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 			}
 			return true
 		})).
-		Return(&entity.User{
+		Return(&domain.User{
 			ID:    userID,
 			Email: newEmail,
 		}, nil)
@@ -443,13 +427,13 @@ func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	userID := 1
 	newEmail := "new_email@example.com"
 
 	mockRepo.EXPECT().
-		GetByID(userID).
+		Update(userID, gomock.Any()).
 		Return(nil, domain.ErrUserNotFound)
 
 	useCase := usecase.NewUserUseCase(mockRepo)
@@ -467,7 +451,7 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	mockRepo.EXPECT().
 		Delete(1).
@@ -485,7 +469,7 @@ func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	mockRepo.EXPECT().
 		Delete(1).
@@ -503,7 +487,7 @@ func TestUserUseCase_EmailExists_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	mockRepo.EXPECT().
 		EmailExists("exist@example.com").
@@ -522,7 +506,7 @@ func TestUserUseCase_EmailExists_RepoErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := NewMockUserRepository(ctrl)
+	mockRepo := NewMockUserPostgres(ctrl)
 
 	dbError := errors.New("database connection failed")
 

@@ -1,10 +1,9 @@
 package usecase
 
 import (
-	"BookingGo/internal/cache"
+	"BookingGo/internal/adapter/redis"
 	"BookingGo/internal/customTemplates"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
 	"context"
@@ -15,29 +14,29 @@ import (
 )
 
 //go:generate mockgen -source=notification_usecase.go -destination=mocks/notification_mocks.go -package=mocks
-type NotificationRepository interface {
-	UpdateSettings(userID int, req *entity.NotificationSettings) error
-	GetAllNotificationsByUserID(userID int) ([]entity.Notification, error)
+type NotificationPostgres interface {
+	UpdateSettings(userID int, req *domain.NotificationSettings) error
+	GetAllNotificationsByUserID(userID int) ([]domain.Notification, error)
 	MarkAllAsRead(recipientID int) error
-	CreateNotif(notification *entity.Notification) error
+	CreateNotif(notification *domain.Notification) error
 }
 
 type NotificationUseCase struct {
-	notificationRepo NotificationRepository
-	bookingRepo      BookingRepository
-	userRepo         UserRepository
-	cache            cache.Cache
+	notificationPostgres NotificationPostgres
+	bookingPostgres      BookingPostgres
+	usePostgres          UserPostgres
+	cache                redis.Cache
 }
 
-func NewNotificationUseCase(notificationRepo NotificationRepository, bookingRepo BookingRepository, userRepo UserRepository, cache cache.Cache) *NotificationUseCase {
-	return &NotificationUseCase{notificationRepo: notificationRepo, bookingRepo: bookingRepo, userRepo: userRepo, cache: cache}
+func NewNotificationUseCase(notificationPostgres NotificationPostgres, bookingPostgres BookingPostgres, usePostgres UserPostgres, cache redis.Cache) *NotificationUseCase {
+	return &NotificationUseCase{notificationPostgres: notificationPostgres, bookingPostgres: bookingPostgres, usePostgres: usePostgres, cache: cache}
 }
 
 func (n *NotificationUseCase) invalidateUserCache(ctx context.Context, userID int) {
 	key := fmt.Sprintf("user:%d", userID)
 	err := n.cache.Delete(ctx, key)
 	if err != nil {
-		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user cache", "error", err.Error())
+		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user redis", "error", err.Error())
 	}
 }
 
@@ -46,32 +45,32 @@ func (n *NotificationUseCase) invalidateUserNotificationsCache(ctx context.Conte
 
 	err := n.cache.Delete(ctx, key)
 	if err != nil {
-		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user cache", "error", err.Error())
+		logger.Log.Error("[NotificationsUseCase] Failed to invalidate user redis", "error", err.Error())
 	}
 }
 
-func (n *NotificationUseCase) CreateNotification(userID int, notificationType enum.TypeOfNotification, params entity.NotificationParams) error {
-	user, err := n.userRepo.GetByID(userID)
+func (n *NotificationUseCase) CreateNotification(userID int, notificationType enum.TypeOfNotification, params domain.NotificationParams) error {
+	user, err := n.usePostgres.GetByID(userID)
 	if err != nil {
 		return err
 	}
 
-	var booking *entity.Booking
+	var booking *domain.Booking
 	if params.BookingID > 0 {
-		booking, err = n.bookingRepo.GetBookingByID(params.BookingID)
+		booking, err = n.bookingPostgres.GetBookingByID(params.BookingID)
 		if err != nil {
 			booking = nil
 		}
 	}
 
 	text, title := buildTextAndTitle(notificationType, user, booking, params)
-	newNotification := &entity.Notification{
+	newNotification := &domain.Notification{
 		RecipientID: userID,
 		Title:       title,
 		Body:        text,
 		IsRead:      false,
 	}
-	err = n.notificationRepo.CreateNotif(newNotification)
+	err = n.notificationPostgres.CreateNotif(newNotification)
 	if err != nil {
 		return err
 	}
@@ -92,7 +91,7 @@ func (n *NotificationUseCase) CreateNotification(userID int, notificationType en
 	return nil
 }
 
-func buildTextAndTitle(notificationType enum.TypeOfNotification, user *entity.User, booking *entity.Booking, params entity.NotificationParams) (string, string) {
+func buildTextAndTitle(notificationType enum.TypeOfNotification, user *domain.User, booking *domain.Booking, params domain.NotificationParams) (string, string) {
 	bookingDate := ""
 	message := ""
 	if booking != nil {
@@ -142,19 +141,19 @@ func renderNotificationTemplate(name string, data map[string]interface{}) string
 	return strings.TrimSpace(buf.String())
 }
 
-func (n *NotificationUseCase) GetMyNotifications(userID int) ([]entity.Notification, error) {
+func (n *NotificationUseCase) GetMyNotifications(userID int) ([]domain.Notification, error) {
 	key := fmt.Sprintf("user:%d:notifications", userID)
 
-	var myNotifications []entity.Notification
+	var myNotifications []domain.Notification
 	err := n.cache.Get(context.Background(), key, &myNotifications)
 	if err == nil {
-		logger.Log.Debug("[NotificationUseCase] Got notifications cache for user", "key", key)
+		logger.Log.Debug("[NotificationUseCase] Got notifications redis for user", "key", key)
 		return myNotifications, nil
 	} else if errors.Is(err, domain.ErrCacheKeyNotFound) {
 		logger.Log.Debug("[NotificationUseCase] Cache key not found", "key", key, "error", err.Error())
 	}
 
-	myNotifications, err = n.notificationRepo.GetAllNotificationsByUserID(userID)
+	myNotifications, err = n.notificationPostgres.GetAllNotificationsByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +165,8 @@ func (n *NotificationUseCase) GetMyNotifications(userID int) ([]entity.Notificat
 	return myNotifications, nil
 }
 
-func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity.NotificationSettings) error {
-	err := n.notificationRepo.UpdateSettings(userID, req)
+func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *domain.NotificationSettings) error {
+	err := n.notificationPostgres.UpdateSettings(userID, req)
 	if err != nil {
 		return err
 	}
@@ -178,7 +177,7 @@ func (n *NotificationUseCase) UpdateNotificationSettings(userID int, req *entity
 }
 
 func (n *NotificationUseCase) MarkAllAsRead(userID int) error {
-	err := n.notificationRepo.MarkAllAsRead(userID)
+	err := n.notificationPostgres.MarkAllAsRead(userID)
 	if err != nil {
 		return err
 	}

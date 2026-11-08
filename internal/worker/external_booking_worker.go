@@ -1,7 +1,8 @@
 package worker
 
 import (
-	"BookingGo/internal/entity"
+	"BookingGo/internal/domain"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/usecase"
 	"BookingGo/pkg/logger"
 	"BookingGo/pkg/natsClient"
@@ -109,7 +110,7 @@ func (w *ExternalBookingWorker) Run() error {
 }
 
 func (w *ExternalBookingWorker) processMessage(msg *nats.Msg) {
-	var req entity.ExternalBookingRequest
+	var req dto.ExternalBookingRequest
 	if err := json.Unmarshal(msg.Data, &req); err != nil {
 		logger.Log.Warn("[ExternalBookingWorker] Invalid message payload", "error", err.Error())
 		w.safeAck(msg, req.ExternalID) // невалидное сообщение - удаляем из очереди
@@ -138,7 +139,7 @@ func (w *ExternalBookingWorker) processMessage(msg *nats.Msg) {
 		return
 	}
 
-	createReq := &entity.CreateBookingRequest{
+	createReq := &domain.CreateBookingRequest{
 		SlotStart:          req.SlotStart,
 		ProblemDescription: req.ProblemDescription,
 	}

@@ -3,7 +3,7 @@ package controller
 import (
 	"BookingGo/internal/auth"
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/usecase"
 	"errors"
 	"net/http"
@@ -27,8 +27,8 @@ func NewBookingController(bookingUseCase *usecase.BookingUseCase) *BookingContro
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        request  body      entity.CreateBookingRequest  true  "Данные бронирования"
-// @Success      201  {object}  entity.Booking           "Созданное бронирование"
+// @Param        request  body      domain.CreateBookingRequest  true  "Данные бронирования"
+// @Success      201  {object}  domain.Booking           "Созданное бронирование"
 // @Failure      400  {object}  map[string]string        "Неверный формат / время в прошлом / слот занят"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
@@ -40,7 +40,7 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		return
 	}
 
-	var req entity.CreateBookingRequest
+	var req dto.CreateBookingRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных"})
 		return
@@ -68,7 +68,7 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 // @Tags         management
 // @Security     BearerAuth
 // @Param        id  path      int  true  "ID бронирования"
-// @Success      200  {object}  entity.Booking           "Обновлённое бронирование"
+// @Success      200  {object}  domain.Booking           "Обновлённое бронирование"
 // @Failure      400  {object}  map[string]string        "ID должен быть числом / бронирование ещё не завершено"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
@@ -111,7 +111,7 @@ func (bc *BookingController) CompleteBookingByID(c *gin.Context) {
 // @Tags         management
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {array}   entity.Booking           "Список всех бронирований"
+// @Success      200  {array}   domain.Booking           "Список всех бронирований"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      403  {object}  map[string]string        "Доступ запрещён"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
@@ -139,7 +139,7 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 // @Tags         bookings
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {array}   entity.Booking           "Список бронирований"
+// @Success      200  {array}   domain.Booking           "Список бронирований"
 // @Failure      401  {object}  map[string]string        "Требуется авторизация"
 // @Failure      500  {object}  map[string]string        "Внутренняя ошибка сервера"
 // @Router       /me/bookings [get]

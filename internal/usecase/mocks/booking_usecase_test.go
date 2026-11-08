@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -14,29 +14,29 @@ import (
 )
 
 var (
-	testClient = &entity.User{
+	testClient = &domain.User{
 		ID:       1,
 		Email:    "client@example.com",
 		Role:     enum.RoleClient,
 		IsActive: true,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: true,
 			IsPhoneSend: false,
 		},
 	}
 
-	testStaff = &entity.User{
+	testStaff = &domain.User{
 		ID:       3,
 		Email:    "staff@mail.ru",
 		Role:     enum.RoleStaff,
 		IsActive: true,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: true,
 			IsPhoneSend: false,
 		},
 	}
 
-	testBooking = &entity.Booking{
+	testBooking = &domain.Booking{
 		ID:                 10,
 		UserID:             1,
 		SlotStart:          time.Now().Add(time.Hour),
@@ -45,7 +45,7 @@ var (
 		ProblemDescription: "problem",
 	}
 
-	testBookingPast = &entity.Booking{
+	testBookingPast = &domain.Booking{
 		ID:                 11,
 		UserID:             1,
 		SlotStart:          time.Now().Add(-2 * time.Hour),
@@ -62,9 +62,9 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 	futureTime := time.Now().Add(24 * time.Hour)
 	ctx := context.Background()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -85,7 +85,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 
 	mockBookingRepo.EXPECT().
 		Create(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, b *entity.Booking) error {
+		DoAndReturn(func(ctx context.Context, b *domain.Booking) error {
 			b.ID = 100
 			return nil
 		})
@@ -99,7 +99,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 		Return(nil)
 
 	mockOutboxRepo.EXPECT().
-		CreateEventContext(ctx, gomock.Cond(func(e *entity.OutboxEvent) bool {
+		CreateEventContext(ctx, gomock.Cond(func(e *domain.OutboxEvent) bool {
 			if e.EventType != string(enum.NewBookingType) {
 				t.Errorf("Expected event type %s, got %s", enum.NewBookingType, e.EventType)
 			}
@@ -109,7 +109,7 @@ func TestBookingUseCase_CreateBooking_Success(t *testing.T) {
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
-	req := &entity.CreateBookingRequest{
+	req := &dto.CreateBookingRequest{
 		SlotStart:          futureTime,
 		ProblemDescription: "Test problem",
 	}
@@ -135,9 +135,9 @@ func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
 	ctx := context.Background()
 	slotCheckedInDB := false
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -163,7 +163,7 @@ func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
 
 	mockBookingRepo.EXPECT().
 		Create(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, b *entity.Booking) error {
+		DoAndReturn(func(ctx context.Context, b *domain.Booking) error {
 			b.ID = 100
 			return nil
 		})
@@ -175,9 +175,9 @@ func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
-	req := &entity.CreateBookingRequest{
+	req := &dto.CreateBookingRequest{
 		SlotStart:          futureTime,
-		ProblemDescription: "Test cache hit",
+		ProblemDescription: "Test redis hit",
 	}
 
 	_, err := useCase.CreateBooking(ctx, testClient.ID, req)
@@ -186,7 +186,7 @@ func TestBookingUseCase_CreateBooking_CacheHit(t *testing.T) {
 		t.Errorf("Expected success, got error: %v", err)
 	}
 	if slotCheckedInDB {
-		t.Error("IsSlotAvailable should not be called on cache hit")
+		t.Error("IsSlotAvailable should not be called on redis hit")
 	}
 }
 
@@ -197,9 +197,9 @@ func TestBookingUseCase_CreateBooking_PastTimeRange(t *testing.T) {
 	pastTime := time.Now().Add(-24 * time.Hour)
 	ctx := context.Background()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -208,7 +208,7 @@ func TestBookingUseCase_CreateBooking_PastTimeRange(t *testing.T) {
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
-	req := &entity.CreateBookingRequest{
+	req := &dto.CreateBookingRequest{
 		SlotStart:          pastTime,
 		ProblemDescription: "Test problem",
 	}
@@ -228,9 +228,9 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 	futureTime := time.Now().Add(24 * time.Hour)
 	ctx := context.Background()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -251,7 +251,7 @@ func TestBookingUseCase_CreateBooking_SlotNotAvailable(t *testing.T) {
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
-	req := &entity.CreateBookingRequest{
+	req := &dto.CreateBookingRequest{
 		SlotStart:          futureTime,
 		ProblemDescription: "Test problem",
 	}
@@ -270,9 +270,9 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 
 	ctx := context.Background()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -281,7 +281,7 @@ func TestBookingUseCase_CreateBooking_UserNotFound(t *testing.T) {
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
-	req := &entity.CreateBookingRequest{
+	req := &dto.CreateBookingRequest{
 		SlotStart:          time.Now().Add(24 * time.Hour),
 		ProblemDescription: "Test problem",
 	}
@@ -297,16 +297,16 @@ func TestBookingUseCase_GetAllBookings_Staff_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
 		GetByID(testStaff.ID).
 		Return(testStaff, nil)
 
-	expectedBookings := []entity.Booking{*testBooking}
+	expectedBookings := []domain.Booking{*testBooking}
 	mockBookingRepo.EXPECT().
 		GetAll().
 		Return(expectedBookings, nil)
@@ -324,9 +324,9 @@ func TestBookingUseCase_GetAllBookings_Client_Forbidden(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -346,9 +346,9 @@ func TestBookingUseCase_GetAllBookings_UserNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockUserRepo.EXPECT().
@@ -368,9 +368,9 @@ func TestBookingUseCase_CompleteBookingByID_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
@@ -379,13 +379,13 @@ func TestBookingUseCase_CompleteBookingByID_Success(t *testing.T) {
 
 	mockBookingRepo.EXPECT().
 		SetBookingComplete(testBookingPast.ID).
-		Return(&entity.Booking{
+		Return(&domain.Booking{
 			ID:     testBookingPast.ID,
 			Status: enum.StatusCompleted,
 		}, nil)
 
 	mockOutboxRepo.EXPECT().
-		CreateEvent(gomock.Cond(func(e *entity.OutboxEvent) bool {
+		CreateEvent(gomock.Cond(func(e *domain.OutboxEvent) bool {
 			if e.EventType != string(enum.CompleteBookingType) {
 				t.Errorf("Expected event type %s, got %s", enum.CompleteBookingType, e.EventType)
 			}
@@ -409,9 +409,9 @@ func TestBookingUseCase_CompleteBookingByID_BookingNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
@@ -431,9 +431,9 @@ func TestBookingUseCase_CompleteBookingByID_NotFinished(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
@@ -453,16 +453,16 @@ func TestBookingUseCase_GetMyBookings_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(domain.ErrCacheKeyNotFound)
 
-	expectedBookings := []entity.Booking{*testBooking}
+	expectedBookings := []domain.Booking{*testBooking}
 	mockBookingRepo.EXPECT().
 		GetAllBookingsByUserID(testClient.ID).
 		Return(expectedBookings, nil)
@@ -484,18 +484,18 @@ func TestBookingUseCase_GetMyBookings_CacheHit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedBookings := []entity.Booking{*testBooking}
+	expectedBookings := []domain.Booking{*testBooking}
 	dbCalled := false
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, key string, dest any) error {
-			if bookingsPtr, ok := dest.(*[]entity.Booking); ok {
+			if bookingsPtr, ok := dest.(*[]domain.Booking); ok {
 				*bookingsPtr = expectedBookings
 			}
 			return nil
@@ -503,7 +503,7 @@ func TestBookingUseCase_GetMyBookings_CacheHit(t *testing.T) {
 
 	mockBookingRepo.EXPECT().
 		GetAllBookingsByUserID(gomock.Any()).
-		DoAndReturn(func(id int) ([]entity.Booking, error) {
+		DoAndReturn(func(id int) ([]domain.Booking, error) {
 			dbCalled = true
 			return expectedBookings, nil
 		}).
@@ -520,7 +520,7 @@ func TestBookingUseCase_GetMyBookings_CacheHit(t *testing.T) {
 		t.Errorf("Expected 1 booking, got %d", len(bookings))
 	}
 	if dbCalled {
-		t.Error("DB should not be called on cache hit")
+		t.Error("DB should not be called on redis hit")
 	}
 }
 
@@ -528,12 +528,12 @@ func TestBookingUseCase_GetMyBookings_CacheMiss(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedBookings := []entity.Booking{*testBooking}
+	expectedBookings := []domain.Booking{*testBooking}
 	cacheSetCalled := false
 
 	mockCache.EXPECT().
@@ -562,7 +562,7 @@ func TestBookingUseCase_GetMyBookings_CacheMiss(t *testing.T) {
 		t.Errorf("Expected 1 booking, got %d", len(bookings))
 	}
 	if !cacheSetCalled {
-		t.Error("Cache Set should be called on cache miss")
+		t.Error("Cache Set should be called on redis miss")
 	}
 }
 
@@ -570,12 +570,12 @@ func TestBookingUseCase_GetMyBookings_CacheSetError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
-	expectedBookings := []entity.Booking{*testBooking}
+	expectedBookings := []domain.Booking{*testBooking}
 
 	mockCache.EXPECT().
 		Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -587,7 +587,7 @@ func TestBookingUseCase_GetMyBookings_CacheSetError(t *testing.T) {
 
 	mockCache.EXPECT().
 		Set(gomock.Any(), gomock.Any(), gomock.Any(), 60*time.Second).
-		Return(errors.New("cache error"))
+		Return(errors.New("redis error"))
 
 	useCase := usecase.NewBookingUseCase(mockBookingRepo, mockUserRepo, mockOutboxRepo, mockCache)
 
@@ -605,9 +605,9 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
@@ -616,7 +616,7 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 
 	mockBookingRepo.EXPECT().
 		SetBookingCancel(testBooking.ID, testBooking.UserID).
-		Return(&entity.Booking{
+		Return(&domain.Booking{
 			ID:     testBooking.ID,
 			Status: enum.StatusCancelled,
 		}, nil)
@@ -630,7 +630,7 @@ func TestBookingUseCase_CancelMyBooking_Success(t *testing.T) {
 		Return(nil)
 
 	mockOutboxRepo.EXPECT().
-		CreateEvent(gomock.Cond(func(e *entity.OutboxEvent) bool {
+		CreateEvent(gomock.Cond(func(e *domain.OutboxEvent) bool {
 			if e.EventType != string(enum.CancelBookingType) {
 				t.Errorf("Expected event type %s, got %s", enum.CancelBookingType, e.EventType)
 			}
@@ -651,9 +651,9 @@ func TestBookingUseCase_CancelMyBooking_BookingIsActive(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().
@@ -673,9 +673,9 @@ func TestBookingUseCase_CancelMyBooking_BookingNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockBookingRepo := NewMockBookingRepository(ctrl)
-	mockUserRepo := NewMockUserRepository(ctrl)
-	mockOutboxRepo := NewMockOutboxRepository(ctrl)
+	mockBookingRepo := NewMockBookingPostgres(ctrl)
+	mockUserRepo := NewMockUserPostgres(ctrl)
+	mockOutboxRepo := NewMockOutboxPostgres(ctrl)
 	mockCache := NewMockCache(ctrl)
 
 	mockBookingRepo.EXPECT().

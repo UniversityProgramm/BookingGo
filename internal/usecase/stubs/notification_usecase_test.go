@@ -2,7 +2,6 @@ package stubs
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -11,35 +10,35 @@ import (
 	"time"
 )
 
-type StubNotificationRepository struct {
-	UpdateSettingsFunc              func(userID int, req *entity.NotificationSettings) error
-	GetAllNotificationsByUserIDFunc func(userID int) ([]entity.Notification, error)
+type StubNotificationPostgres struct {
+	UpdateSettingsFunc              func(userID int, req *domain.NotificationSettings) error
+	GetAllNotificationsByUserIDFunc func(userID int) ([]domain.Notification, error)
 	MarkAllAsReadFunc               func(recipientID int) error
-	CreateNotifFunc                 func(notification *entity.Notification) error
+	CreateNotifFunc                 func(notification *domain.Notification) error
 }
 
-func (m *StubNotificationRepository) UpdateSettings(userID int, req *entity.NotificationSettings) error {
+func (m *StubNotificationPostgres) UpdateSettings(userID int, req *domain.NotificationSettings) error {
 	if m.UpdateSettingsFunc != nil {
 		return m.UpdateSettingsFunc(userID, req)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *StubNotificationRepository) GetAllNotificationsByUserID(userID int) ([]entity.Notification, error) {
+func (m *StubNotificationPostgres) GetAllNotificationsByUserID(userID int) ([]domain.Notification, error) {
 	if m.GetAllNotificationsByUserIDFunc != nil {
 		return m.GetAllNotificationsByUserIDFunc(userID)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubNotificationRepository) MarkAllAsRead(recipientID int) error {
+func (m *StubNotificationPostgres) MarkAllAsRead(recipientID int) error {
 	if m.MarkAllAsReadFunc != nil {
 		return m.MarkAllAsReadFunc(recipientID)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *StubNotificationRepository) CreateNotif(notification *entity.Notification) error {
+func (m *StubNotificationPostgres) CreateNotif(notification *domain.Notification) error {
 	if m.CreateNotifFunc != nil {
 		return m.CreateNotifFunc(notification)
 	}
@@ -47,31 +46,31 @@ func (m *StubNotificationRepository) CreateNotif(notification *entity.Notificati
 }
 
 var (
-	testNotifUserWithAll = &entity.User{
+	testNotifUserWithAll = &domain.User{
 		ID:    1,
 		Email: "user@example.com",
 		FIO:   "Иванов Иван Иванович",
 		Phone: "+79991234567",
 		Role:  enum.RoleClient,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: true,
 			IsPhoneSend: true,
 		},
 	}
 
-	testNotifUserWebOnly = &entity.User{
+	testNotifUserWebOnly = &domain.User{
 		ID:    2,
 		Email: "web@example.com",
 		FIO:   "Петров Петр Петрович",
 		Phone: "+79997654321",
 		Role:  enum.RoleClient,
-		UserNotificationSettings: entity.NotificationSettings{
+		UserNotificationSettings: domain.NotificationSettings{
 			IsEmailSend: false,
 			IsPhoneSend: false,
 		},
 	}
 
-	testNotifBooking = &entity.Booking{
+	testNotifBooking = &domain.Booking{
 		ID:                 100,
 		UserID:             1,
 		SlotStart:          time.Now().Add(24 * time.Hour),
@@ -80,7 +79,7 @@ var (
 		ProblemDescription: "Engine not working",
 	}
 
-	testNotifNotification = &entity.Notification{
+	testNotifNotification = &domain.Notification{
 		ID:          1,
 		RecipientID: 1,
 		Title:       "Test title",
@@ -93,8 +92,8 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 	notifCreated := false
 	cacheInvalidated := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		CreateNotifFunc: func(notification *entity.Notification) error {
+	stubNotifRepo := &StubNotificationPostgres{
+		CreateNotifFunc: func(notification *domain.Notification) error {
 			notifCreated = true
 			if notification.RecipientID != testNotifUserWithAll.ID {
 				t.Errorf("Expected RecipientID %d, got %d", testNotifUserWithAll.ID, notification.RecipientID)
@@ -112,14 +111,14 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 		},
 	}
 
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubUserRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testNotifUserWithAll, nil
 		},
 	}
 
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+	stubBookingRepo := &StubBookingPostgres{
+		GetBookingByIDFunc: func(id int) (*domain.Booking, error) {
 			return testNotifBooking, nil
 		},
 	}
@@ -133,7 +132,7 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, stubBookingRepo, stubUserRepo, stubCache)
 
-	params := entity.NotificationParams{
+	params := domain.NotificationParams{
 		BookingID: testNotifBooking.ID,
 		IP:        "127.0.0.1",
 	}
@@ -147,32 +146,32 @@ func TestNotificationUseCase_CreateNotification_Success_WithAllChannels(t *testi
 		t.Error("Notification should be created")
 	}
 	if !cacheInvalidated {
-		t.Error("Notifications cache should be invalidated")
+		t.Error("Notifications redis should be invalidated")
 	}
 }
 
 func TestNotificationUseCase_CreateNotification_WebOnly(t *testing.T) {
 	notifCreated := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		CreateNotifFunc: func(notification *entity.Notification) error {
+	stubNotifRepo := &StubNotificationPostgres{
+		CreateNotifFunc: func(notification *domain.Notification) error {
 			notifCreated = true
 			return nil
 		},
 	}
 
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubUserRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testNotifUserWebOnly, nil
 		},
 	}
 
-	stubBookingRepo := &StubBookingRepository{}
+	stubBookingRepo := &StubBookingPostgres{}
 	stubCache := &StubCacheService{}
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, stubBookingRepo, stubUserRepo, stubCache)
 
-	params := entity.NotificationParams{
+	params := domain.NotificationParams{
 		BookingID: testNotifBooking.ID,
 	}
 
@@ -190,21 +189,21 @@ func TestNotificationUseCase_CreateNotification_WithoutBooking(t *testing.T) {
 	notifCreated := false
 	bookingRepoCalled := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		CreateNotifFunc: func(notification *entity.Notification) error {
+	stubNotifRepo := &StubNotificationPostgres{
+		CreateNotifFunc: func(notification *domain.Notification) error {
 			notifCreated = true
 			return nil
 		},
 	}
 
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubUserRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testNotifUserWebOnly, nil
 		},
 	}
 
-	stubBookingRepo := &StubBookingRepository{
-		GetBookingByIDFunc: func(id int) (*entity.Booking, error) {
+	stubBookingRepo := &StubBookingPostgres{
+		GetBookingByIDFunc: func(id int) (*domain.Booking, error) {
 			bookingRepoCalled = true
 			return nil, nil
 		},
@@ -214,7 +213,7 @@ func TestNotificationUseCase_CreateNotification_WithoutBooking(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, stubBookingRepo, stubUserRepo, stubCache)
 
-	params := entity.NotificationParams{
+	params := domain.NotificationParams{
 		BookingID: 0,
 	}
 
@@ -232,18 +231,18 @@ func TestNotificationUseCase_CreateNotification_WithoutBooking(t *testing.T) {
 }
 
 func TestNotificationUseCase_CreateNotification_UserNotFound(t *testing.T) {
-	stubNotifRepo := &StubNotificationRepository{}
-	stubUserRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubNotifRepo := &StubNotificationPostgres{}
+	stubUserRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
-	stubBookingRepo := &StubBookingRepository{}
+	stubBookingRepo := &StubBookingPostgres{}
 	stubCache := &StubCacheService{}
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, stubBookingRepo, stubUserRepo, stubCache)
 
-	err := useCase.CreateNotification(999, enum.AuthType, entity.NotificationParams{})
+	err := useCase.CreateNotification(999, enum.AuthType, domain.NotificationParams{})
 
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Errorf("Expected ErrUserNotFound, got: %v", err)
@@ -251,11 +250,11 @@ func TestNotificationUseCase_CreateNotification_UserNotFound(t *testing.T) {
 }
 
 func TestNotificationUseCase_GetMyNotifications_CacheHit(t *testing.T) {
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 	dbCalled := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		GetAllNotificationsByUserIDFunc: func(userID int) ([]entity.Notification, error) {
+	stubNotifRepo := &StubNotificationPostgres{
+		GetAllNotificationsByUserIDFunc: func(userID int) ([]domain.Notification, error) {
 			dbCalled = true
 			return expectedNotifs, nil
 		},
@@ -263,7 +262,7 @@ func TestNotificationUseCase_GetMyNotifications_CacheHit(t *testing.T) {
 
 	stubCache := &StubCacheService{
 		GetFunc: func(ctx context.Context, key string, dest any) error {
-			if notifsPtr, ok := dest.(*[]entity.Notification); ok {
+			if notifsPtr, ok := dest.(*[]domain.Notification); ok {
 				*notifsPtr = expectedNotifs
 			}
 			return nil
@@ -281,16 +280,16 @@ func TestNotificationUseCase_GetMyNotifications_CacheHit(t *testing.T) {
 		t.Errorf("Expected 1 notification, got %d", len(notifs))
 	}
 	if dbCalled {
-		t.Error("DB should not be called on cache hit")
+		t.Error("DB should not be called on redis hit")
 	}
 }
 
 func TestNotificationUseCase_GetMyNotifications_CacheMiss(t *testing.T) {
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 	cacheSetCalled := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		GetAllNotificationsByUserIDFunc: func(userID int) ([]entity.Notification, error) {
+	stubNotifRepo := &StubNotificationPostgres{
+		GetAllNotificationsByUserIDFunc: func(userID int) ([]domain.Notification, error) {
 			return expectedNotifs, nil
 		},
 	}
@@ -316,15 +315,15 @@ func TestNotificationUseCase_GetMyNotifications_CacheMiss(t *testing.T) {
 		t.Errorf("Expected 1 notification, got %d", len(notifs))
 	}
 	if !cacheSetCalled {
-		t.Error("Cache Set should be called on cache miss")
+		t.Error("Cache Set should be called on redis miss")
 	}
 }
 
 func TestNotificationUseCase_GetMyNotifications_CacheSetError(t *testing.T) {
-	expectedNotifs := []entity.Notification{*testNotifNotification}
+	expectedNotifs := []domain.Notification{*testNotifNotification}
 
-	stubNotifRepo := &StubNotificationRepository{
-		GetAllNotificationsByUserIDFunc: func(userID int) ([]entity.Notification, error) {
+	stubNotifRepo := &StubNotificationPostgres{
+		GetAllNotificationsByUserIDFunc: func(userID int) ([]domain.Notification, error) {
 			return expectedNotifs, nil
 		},
 	}
@@ -334,7 +333,7 @@ func TestNotificationUseCase_GetMyNotifications_CacheSetError(t *testing.T) {
 			return domain.ErrCacheKeyNotFound
 		},
 		SetFunc: func(ctx context.Context, key string, value any, ttl time.Duration) error {
-			return errors.New("cache error")
+			return errors.New("redis error")
 		},
 	}
 
@@ -354,8 +353,8 @@ func TestNotificationUseCase_UpdateNotificationSettings_Success(t *testing.T) {
 	settingsUpdated := false
 	cacheInvalidated := false
 
-	stubNotifRepo := &StubNotificationRepository{
-		UpdateSettingsFunc: func(userID int, req *entity.NotificationSettings) error {
+	stubNotifRepo := &StubNotificationPostgres{
+		UpdateSettingsFunc: func(userID int, req *domain.NotificationSettings) error {
 			settingsUpdated = true
 			if userID != testNotifUserWithAll.ID {
 				t.Errorf("Expected userID %d, got %d", testNotifUserWithAll.ID, userID)
@@ -373,7 +372,7 @@ func TestNotificationUseCase_UpdateNotificationSettings_Success(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, nil, nil, stubCache)
 
-	newSettings := &entity.NotificationSettings{
+	newSettings := &domain.NotificationSettings{
 		IsEmailSend: false,
 		IsPhoneSend: true,
 	}
@@ -387,15 +386,15 @@ func TestNotificationUseCase_UpdateNotificationSettings_Success(t *testing.T) {
 		t.Error("Settings should be updated")
 	}
 	if !cacheInvalidated {
-		t.Error("User cache should be invalidated")
+		t.Error("User redis should be invalidated")
 	}
 }
 
 func TestNotificationUseCase_UpdateNotificationSettings_DBError(t *testing.T) {
 	dbError := errors.New("database error")
 
-	stubNotifRepo := &StubNotificationRepository{
-		UpdateSettingsFunc: func(userID int, req *entity.NotificationSettings) error {
+	stubNotifRepo := &StubNotificationPostgres{
+		UpdateSettingsFunc: func(userID int, req *domain.NotificationSettings) error {
 			return dbError
 		},
 	}
@@ -404,7 +403,7 @@ func TestNotificationUseCase_UpdateNotificationSettings_DBError(t *testing.T) {
 
 	useCase := usecase.NewNotificationUseCase(stubNotifRepo, nil, nil, stubCache)
 
-	err := useCase.UpdateNotificationSettings(testNotifUserWithAll.ID, &entity.NotificationSettings{})
+	err := useCase.UpdateNotificationSettings(testNotifUserWithAll.ID, &domain.NotificationSettings{})
 
 	if !errors.Is(err, dbError) {
 		t.Errorf("Expected database error, got: %v", err)
@@ -415,7 +414,7 @@ func TestNotificationUseCase_MarkAllAsRead_Success(t *testing.T) {
 	markedAsRead := false
 	cacheInvalidated := false
 
-	stubNotifRepo := &StubNotificationRepository{
+	stubNotifRepo := &StubNotificationPostgres{
 		MarkAllAsReadFunc: func(recipientID int) error {
 			markedAsRead = true
 			if recipientID != testNotifUserWithAll.ID {
@@ -443,14 +442,14 @@ func TestNotificationUseCase_MarkAllAsRead_Success(t *testing.T) {
 		t.Error("Notifications should be marked as read")
 	}
 	if !cacheInvalidated {
-		t.Error("Notifications cache should be invalidated")
+		t.Error("Notifications redis should be invalidated")
 	}
 }
 
 func TestNotificationUseCase_MarkAllAsRead_DBError(t *testing.T) {
 	dbError := errors.New("database error")
 
-	stubNotifRepo := &StubNotificationRepository{
+	stubNotifRepo := &StubNotificationPostgres{
 		MarkAllAsReadFunc: func(recipientID int) error {
 			return dbError
 		},

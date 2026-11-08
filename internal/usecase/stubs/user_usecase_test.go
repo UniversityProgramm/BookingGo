@@ -2,7 +2,7 @@ package stubs
 
 import (
 	"BookingGo/internal/domain"
-	"BookingGo/internal/entity"
+	"BookingGo/internal/dto"
 	"BookingGo/internal/enum"
 	"BookingGo/internal/usecase"
 	"context"
@@ -11,75 +11,75 @@ import (
 	"time"
 )
 
-type StubUserRepository struct {
-	GetAllFunc            func() ([]entity.User, error)
-	GetByIDFunc           func(id int) (*entity.User, error)
-	GetByEmailFunc        func(email string) (*entity.User, error)
-	CreateFunc            func(user *entity.User) error
-	UpdateFunc            func(id int, requestUser map[string]interface{}) (*entity.User, error)
+type StubUserPostgres struct {
+	GetAllFunc            func() ([]domain.User, error)
+	GetByIDFunc           func(id int) (*domain.User, error)
+	GetByEmailFunc        func(email string) (*domain.User, error)
+	CreateFunc            func(user *domain.User) error
+	UpdateFunc            func(id int, requestUser map[string]interface{}) (*domain.User, error)
 	DeleteFunc            func(id int) error
 	EmailExistsFunc       func(email string) (bool, error)
-	GetByEmailContextFunc func(ctx context.Context, email string) (*entity.User, error)
-	GetByIDContextFunc    func(ctx context.Context, id int) (*entity.User, error)
+	GetByEmailContextFunc func(ctx context.Context, email string) (*domain.User, error)
+	GetByIDContextFunc    func(ctx context.Context, id int) (*domain.User, error)
 }
 
-func (m *StubUserRepository) GetAll() ([]entity.User, error) {
+func (m *StubUserPostgres) GetAll() ([]domain.User, error) {
 	if m.GetAllFunc != nil {
 		return m.GetAllFunc()
 	}
-	return []entity.User{}, nil
+	return []domain.User{}, nil
 }
 
-func (m *StubUserRepository) GetByID(id int) (*entity.User, error) {
+func (m *StubUserPostgres) GetByID(id int) (*domain.User, error) {
 	if m.GetByIDFunc != nil {
 		return m.GetByIDFunc(id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) GetByEmail(email string) (*entity.User, error) {
+func (m *StubUserPostgres) GetByEmail(email string) (*domain.User, error) {
 	if m.GetByEmailFunc != nil {
 		return m.GetByEmailFunc(email)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) Create(user *entity.User) error {
+func (m *StubUserPostgres) Create(user *domain.User) error {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(user)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) Update(id int, requestUser map[string]interface{}) (*entity.User, error) {
+func (m *StubUserPostgres) Update(id int, requestUser map[string]interface{}) (*domain.User, error) {
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(id, requestUser)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) Delete(id int) error {
+func (m *StubUserPostgres) Delete(id int) error {
 	if m.DeleteFunc != nil {
 		return m.DeleteFunc(id)
 	}
 	return domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) EmailExists(email string) (bool, error) {
+func (m *StubUserPostgres) EmailExists(email string) (bool, error) {
 	if m.EmailExistsFunc != nil {
 		return m.EmailExistsFunc(email)
 	}
 	return false, domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) GetByIDContext(ctx context.Context, id int) (*entity.User, error) {
+func (m *StubUserPostgres) GetByIDContext(ctx context.Context, id int) (*domain.User, error) {
 	if m.GetByIDContextFunc != nil {
 		return m.GetByIDContextFunc(ctx, id)
 	}
 	return nil, domain.ErrNotImplemented
 }
 
-func (m *StubUserRepository) GetByEmailContext(ctx context.Context, email string) (*entity.User, error) {
+func (m *StubUserPostgres) GetByEmailContext(ctx context.Context, email string) (*domain.User, error) {
 	if m.GetByEmailContextFunc != nil {
 		return m.GetByEmailContextFunc(ctx, email)
 	}
@@ -87,7 +87,7 @@ func (m *StubUserRepository) GetByEmailContext(ctx context.Context, email string
 }
 
 // Тесты
-var testUser = &entity.User{
+var testUser = &domain.User{
 	ID:           1,
 	Email:        "test@example.com",
 	PasswordHash: "hashed_password",
@@ -97,16 +97,16 @@ var testUser = &entity.User{
 	IsActive:     true,
 	CreatedAt:    time.Now(),
 	UpdatedAt:    time.Now(),
-	UserNotificationSettings: entity.NotificationSettings{
+	UserNotificationSettings: domain.NotificationSettings{
 		IsEmailSend: true,
 		IsPhoneSend: false,
 	},
 }
 
 func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetAllFunc: func() ([]entity.User, error) {
-			return []entity.User{*testUser}, nil
+	stubRepo := &StubUserPostgres{
+		GetAllFunc: func() ([]domain.User, error) {
+			return []domain.User{*testUser}, nil
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
@@ -118,8 +118,8 @@ func TestUserUseCase_GetAllUsers_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByID_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return testUser, nil
 		},
 	}
@@ -132,8 +132,8 @@ func TestUserUseCase_GetUserByID_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByIDFunc: func(id int) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -146,8 +146,8 @@ func TestUserUseCase_GetUserByID_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailFunc: func(email string) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByEmailFunc: func(email string) (*domain.User, error) {
 			return testUser, nil
 		},
 	}
@@ -160,8 +160,8 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailFunc: func(email string) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByEmailFunc: func(email string) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -174,8 +174,8 @@ func TestUserUseCase_GetUserByEmail_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*domain.User, error) {
 			return testUser, nil
 		},
 	}
@@ -188,8 +188,8 @@ func TestUserUseCase_GetUserByEmailContext_Success(t *testing.T) {
 }
 
 func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByEmailContextFunc: func(ctx context.Context, email string) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		GetByEmailContextFunc: func(ctx context.Context, email string) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -202,11 +202,11 @@ func TestUserUseCase_GetUserByEmailContext_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_CreateUser_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, nil
 		},
-		CreateFunc: func(user *entity.User) error {
+		CreateFunc: func(user *domain.User) error {
 			if len(user.PasswordHash) == 0 {
 				t.Error("Пароль не был захэширован")
 			}
@@ -215,7 +215,7 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
 
-	_, err := useCase.CreateUser(&entity.CreateUserRequest{
+	_, err := useCase.CreateUser(&dto.CreateUserRequest{
 		Email:    "new@mail.ru",
 		Password: "qwerty",
 		FIO:      "New user",
@@ -228,14 +228,14 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 }
 
 func TestUserUseCase_CreateUser_EmailTaken(t *testing.T) {
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		EmailExistsFunc: func(email string) (bool, error) {
 			return true, nil
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
 
-	_, err := useCase.CreateUser(&entity.CreateUserRequest{
+	_, err := useCase.CreateUser(&dto.CreateUserRequest{
 		Email:    "takenemail@mail.ru",
 		Password: "123456",
 		FIO:      "Test user",
@@ -251,11 +251,8 @@ func TestUserUseCase_UpdateUserProfile_Success(t *testing.T) {
 	updatedFIO := "Updated Name"
 	updatedPhone := "+79999999999"
 
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testUser, nil
-		},
-		UpdateFunc: func(id int, updates map[string]interface{}) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]interface{}) (*domain.User, error) {
 			if fio, ok := updates["fio"]; ok {
 				if fio != updatedFIO {
 					t.Errorf("Неверное значение FIO: %v", fio)
@@ -274,7 +271,7 @@ func TestUserUseCase_UpdateUserProfile_Success(t *testing.T) {
 	}
 
 	useCase := usecase.NewUserUseCase(stubRepo)
-	req := &entity.UpdateUserProfileRequest{
+	req := &dto.UpdateUserProfileRequest{
 		FIO:   &updatedFIO,
 		Phone: &updatedPhone,
 	}
@@ -286,15 +283,17 @@ func TestUserUseCase_UpdateUserProfile_Success(t *testing.T) {
 }
 
 func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	fio := "new test fio"
+	phone := "123123123"
+	stubRepo := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]interface{}) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 	useCase := usecase.NewUserUseCase(stubRepo)
-	req := &entity.UpdateUserProfileRequest{
-		FIO:   new("new test fio"),
-		Phone: new("123123123"),
+	req := &dto.UpdateUserProfileRequest{
+		FIO:   &fio,
+		Phone: &phone,
 	}
 
 	_, err := useCase.UpdateUserProfile(1, req)
@@ -304,11 +303,8 @@ func TestUserUseCase_UpdateUserProfile_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
-			return testUser, nil
-		},
-		UpdateFunc: func(id int, updates map[string]any) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			if fio, ok := updates["fio"]; ok {
 				if fio != "Updated FIO" {
 					t.Errorf("Неверное значение FIO: %v", fio)
@@ -333,8 +329,8 @@ func TestUserUseCase_UpdateUserData_Success(t *testing.T) {
 }
 
 func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
-		GetByIDFunc: func(id int) (*entity.User, error) {
+	stubRepo := &StubUserPostgres{
+		UpdateFunc: func(id int, updates map[string]any) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
@@ -349,7 +345,7 @@ func TestUserUseCase_UpdateUserData_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_DeleteUser_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		DeleteFunc: func(id int) error {
 			return nil
 		},
@@ -363,7 +359,7 @@ func TestUserUseCase_DeleteUser_Success(t *testing.T) {
 }
 
 func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		DeleteFunc: func(id int) error {
 			return domain.ErrUserNotFound
 		},
@@ -377,7 +373,7 @@ func TestUserUseCase_DeleteUser_UserNotFound(t *testing.T) {
 }
 
 func TestUserUseCase_EmailExists_Success(t *testing.T) {
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		EmailExistsFunc: func(email string) (bool, error) {
 			if email == "taken@example.com" {
 				return true, nil
@@ -398,7 +394,7 @@ func TestUserUseCase_EmailExists_Success(t *testing.T) {
 
 func TestUserUseCase_EmailExists_Error(t *testing.T) {
 	dbErr := errors.New("database error")
-	stubRepo := &StubUserRepository{
+	stubRepo := &StubUserPostgres{
 		EmailExistsFunc: func(email string) (bool, error) {
 			return false, dbErr
 		},

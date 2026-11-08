@@ -1,23 +1,23 @@
 package ratelimit
 
 import (
-	"BookingGo/internal/cache"
+	"BookingGo/internal/adapter/redis"
 	"context"
 	"fmt"
 	"time"
 )
 
 type RedisLimiter struct {
-	cache cache.Cache
+	cache redis.Cache
 }
 
-func NewRedisLimiter(cache cache.Cache) (*RedisLimiter, error) {
+func NewRedisLimiter(cache redis.Cache) (*RedisLimiter, error) {
 	if cache == nil {
-		return nil, fmt.Errorf("cache is nil")
+		return nil, fmt.Errorf("redis is nil")
 	}
 
 	if cache.GetClient() == nil {
-		return nil, fmt.Errorf("cache is not Redis-based")
+		return nil, fmt.Errorf("redis is not Redis-based")
 	}
 
 	return &RedisLimiter{cache: cache}, nil
