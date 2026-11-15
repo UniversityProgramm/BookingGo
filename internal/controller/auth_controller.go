@@ -222,6 +222,10 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
 		} else if errors.Is(err, domain.ErrSamePassword) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Новый пароль совпадает с текущим"})
+		} else if errors.Is(err, domain.ErrTotpSecretNotSet) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Введите код из приложения-аутентификатора"})
+		} else if errors.Is(err, domain.ErrInvalidTotpCode) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный код двухфакторной защиты"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены пароля"})
 		}
@@ -268,6 +272,10 @@ func (ac *AuthController) ChangeEmail(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Введен неверный текущий пароль"})
 		} else if errors.Is(err, domain.ErrEmailTaken) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Данная почта уже занята"})
+		} else if errors.Is(err, domain.ErrTotpSecretNotSet) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Введите код из приложения-аутентификатора"})
+		} else if errors.Is(err, domain.ErrInvalidTotpCode) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный код двухфакторной защиты"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка смены почты"})
 		}

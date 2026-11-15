@@ -37,7 +37,7 @@ func SetupRoutes(r *gin.Engine, deps *Dependencies) {
 	{
 		authGroup.POST("/login", authController.Login)
 		authGroup.POST("/register", authController.Register)
-		authGroup.POST("/logout", authController.Logout)
+		authGroup.POST("/logout", auth.AuthMiddleware(deps.BlacklistService), authController.Logout)
 	}
 
 	protectedGroup := api.Group("/me")

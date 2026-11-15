@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"BookingGo/internal/domain"
 	"BookingGo/internal/dto"
 	"BookingGo/internal/usecase"
 	"BookingGo/pkg/logger"
@@ -139,7 +138,7 @@ func (w *ExternalBookingWorker) processMessage(msg *nats.Msg) {
 		return
 	}
 
-	createReq := &domain.CreateBookingRequest{
+	createReq := &dto.CreateBookingRequest{
 		SlotStart:          req.SlotStart,
 		ProblemDescription: req.ProblemDescription,
 	}

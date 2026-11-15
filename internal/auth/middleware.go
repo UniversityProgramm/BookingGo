@@ -4,7 +4,6 @@ import (
 	"BookingGo/internal/enum"
 	"BookingGo/pkg/logger"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +35,7 @@ func AuthMiddleware(blacklist Blacklist) gin.HandlerFunc {
 			return
 		}
 
-		if blacklist.IsInBlacklist(c.Request.Context(), strconv.Itoa(claims.UserID)) {
+		if blacklist.IsInBlacklist(c.Request.Context(), claims.ID) {
 			logger.Log.Warn("[AuthMiddleware] Request with blacklisted token", "user_id", claims.UserID, "jti", claims.ID, "ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Токен отозван"})
 			return

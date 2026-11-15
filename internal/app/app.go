@@ -97,7 +97,7 @@ func Init(router *gin.Engine) (*Workers, error) {
 
 	userUseCase := usecase.NewUserUseCase(userRepo)
 	notificationUseCase := usecase.NewNotificationUseCase(notificationRepo, bookingRepo, userRepo, cacheService)
-	authUseCase := usecase.NewAuthUseCase(userUseCase, outboxRepo, totpService, cacheService, blacklistService)
+	authUseCase := usecase.NewAuthUseCase(userRepo, outboxRepo, totpService, cacheService, blacklistService)
 	bookingUseCase := usecase.NewBookingUseCase(bookingRepo, userRepo, outboxRepo, cacheService)
 	logger.Log.Info("[app] All usecases initialized")
 

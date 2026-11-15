@@ -20,13 +20,13 @@ type UpdateUserProfileRequest struct {
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"cur_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=8,max=20"`
-	OtpCode         string `json:"otp_code" binding:"required,len=6"`
+	OtpCode         string `json:"otp_code" binding:"omitempty,len=6"`
 }
 
 type ChangeEmailRequest struct {
 	NewEmail        string `json:"new_email" binding:"required,email"`
 	ConfirmPassword string `json:"confirm_password" binding:"required"`
-	OtpCode         string `json:"otp_code" binding:"required,len=6"`
+	OtpCode         string `json:"otp_code" binding:"omitempty,len=6"`
 }
 
 type VerifyTotpRequest struct {

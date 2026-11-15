@@ -7,3 +7,7 @@ bin/
 .env
 docker-compose.override.yml
 terminal_commands.txt
+frontend/
+photo_*.jpg
+coverage*
+.env.*

@@ -7,3 +7,10 @@ tmp/
 bin/
 .env.docker
 terminal_commands.txt
+node_modules/
+frontend/dist/
+frontend/coverage/
+.sites-runtime/
+.env.*
+!.env.example
+!.env.docker.example
